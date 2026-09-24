@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from "react"
+import QRCode from 'qrcode'
+import { openPrintPreview } from '@/services/printWindow'
 import { useTranslation } from "react-i18next"
 import { formatExpiryDate, parseExpiryDate } from "@/utils/dateUtils"
 import { escapeHtml } from "@/utils/escapeHtml"
@@ -272,8 +274,8 @@ export default function App() {
     }
 
     const billboardsToPrint = customBillboards || filteredBillboards
+    return openPrintPreview(async () => {
 
-    const QRCode = await import('qrcode')
     const qrCodes: { [key: string]: string } = {}
     for (const billboard of billboardsToPrint) {
       if (billboard.coordinates) {
@@ -424,54 +426,9 @@ export default function App() {
             </tbody>
           </table>`
         })() : ''}
-        <script>
-          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-          window.onload = function() {
-            if (isMobile) {
-              document.body.style.background = 'white';
-              const printBtn = document.createElement('button');
-              printBtn.id = 'mobile-print-btn';
-              printBtn.className = 'no-print mobile-print-btn';
-              printBtn.innerHTML = 'حفظ كـ PDF';
-              printBtn.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#E8CC64;color:#000;padding:12px 30px;border:none;border-radius:25px;font-weight:bold;font-size:16px;z-index:99999;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.3);';
-              printBtn.onclick = function() {
-                this.style.setProperty('display', 'none', 'important');
-                this.style.setProperty('visibility', 'hidden', 'important');
-                setTimeout(function() {
-                  window.print();
-                  setTimeout(function() {
-                    if (printBtn) {
-                      printBtn.style.display = 'block';
-                      printBtn.style.visibility = 'visible';
-                    }
-                  }, 2000);
-                }, 100);
-              };
-              document.body.appendChild(printBtn);
-            } else {
-              setTimeout(function() { window.print(); }, 800);
-            }
-          };
-        </script>
-      </body>
-      </html>
-    `
-
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-    if (isMobile) {
-      const blob = new Blob([printContent], { type: 'text/html;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const newWindow = window.open(url, '_blank')
-      if (!newWindow) {
-        const link = document.createElement('a'); link.href = url; link.target = '_blank'; link.click()
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60000)
-    } else {
-      const printWindow = window.open("", "_blank")
-      if (!printWindow) return
-      printWindow.document.write(printContent)
-      printWindow.document.close()
-    }
+      </body></html>`
+    return printContent
+    }, 'جدول اللوحات', billboardsToPrint.length)
   }
 
   // Excel export

@@ -30,8 +30,12 @@ function MapLayerSelectorComponent({ currentLayer, onLayerChange, className = ''
         setIsOpen(false)
       }
     }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setIsOpen(false); buttonRef.current?.focus() }
+    }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('keydown', handleEscape)
+    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('keydown', handleEscape) }
   }, [isOpen])
 
   const currentOption = LAYER_OPTIONS.find(o => o.id === currentLayer) || LAYER_OPTIONS[0]
@@ -62,7 +66,7 @@ function MapLayerSelectorComponent({ currentLayer, onLayerChange, className = ''
           className="absolute top-full right-0 mt-2 sm:top-0 sm:right-full sm:mr-2 sm:mt-0 z-[2000] animate-fade-in"
           style={{ direction: 'rtl' }}
         >
-          <div className="bg-card/95 backdrop-blur-xl rounded-2xl border border-border/50 shadow-2xl overflow-hidden w-[240px]">
+          <div className="bg-card/95 backdrop-blur-xl rounded-2xl border border-border/50 shadow-2xl overflow-y-auto max-h-[50dvh] overscroll-contain w-[min(240px,calc(100vw-100px))]">
             <div className="px-4 py-3 border-b border-border/30 bg-gradient-to-l from-primary/10 to-transparent">
               <h4 className="text-sm font-bold text-foreground" style={{ fontFamily: 'Doran, Tajawal, sans-serif' }}>
                 طبقات الخريطة
@@ -79,6 +83,7 @@ function MapLayerSelectorComponent({ currentLayer, onLayerChange, className = ''
                 return (
                   <button
                     key={option.id}
+                    aria-pressed={isActive}
                     onClick={() => {
                       onLayerChange(option.id)
                       setIsOpen(false)

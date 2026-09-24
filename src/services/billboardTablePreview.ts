@@ -1,4 +1,5 @@
 import type { Billboard } from '@/types'
+import QRCode from 'qrcode'
 import type { PricingOptions } from '@/components/PrintDialog'
 import { escapeHtml } from '@/utils/escapeHtml'
 import { getPrice, formatPrice, calculateDiscountedPrice, RENTAL_PERIODS } from './pricingService'
@@ -6,7 +7,6 @@ import { getPrice, formatPrice, calculateDiscountedPrice, RENTAL_PERIODS } from 
 export async function buildTablePreview(boards: Billboard[], logo: boolean, images: boolean, pricing: PricingOptions, offset: number) {
   const safe = (value: unknown) => escapeHtml(String(value ?? '—'))
   const asset = (path: string) => safe(new URL(`${import.meta.env.BASE_URL}${path}`, document.baseURI).href)
-  const QRCode = await import('qrcode')
   const rows = await Promise.all(boards.map(async (board, index) => {
     const level = board.level?.toUpperCase() || 'A'
     const price = getPrice(level, board.size, pricing.period, 'company')
