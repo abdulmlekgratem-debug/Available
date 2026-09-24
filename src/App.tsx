@@ -686,10 +686,11 @@ export default function App() {
 
         <PrintDialog
           isOpen={showSelectedPrintDialog}
+          allowCardLayout
           onClose={() => setShowSelectedPrintDialog(false)}
           onPrint={(includeLogo, includeImages, pricingOptions) => {
             const selectedData = billboards.filter(b => selectedBillboards.has(b.id))
-            handlePrint(includeLogo, includeImages, selectedData, pricingOptions)
+            return handlePrint(includeLogo, includeImages, selectedData, pricingOptions)
           }}
           billboards={billboards.filter(b => selectedBillboards.has(b.id))}
         />

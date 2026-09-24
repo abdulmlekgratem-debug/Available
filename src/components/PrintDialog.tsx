@@ -3,7 +3,7 @@
  * يتيح للمستخدم اختيار طباعة PDF بالشعار أو بدونه وبالصور أو بدونها مع خيارات الأسعار
  */
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { createPortal } from "react-dom"
 import { FileDown, Image, ImageOff, Camera, CameraOff, DollarSign, Percent, Tag, Calculator } from "lucide-react"
@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { RENTAL_PERIODS, getPrice, formatPrice, calculateDiscountedPrice, calculateDiscountPercentage } from "@/services/pricingService"
 import { Billboard } from "@/types"
+import { printBillboardCards, buildBillboardCardsHTML } from "@/services/billboardCardPrint"
+import { buildTablePreview } from "@/services/billboardTablePreview"
 
 export interface PricingOptions {
   includePricing: boolean
@@ -28,15 +30,41 @@ interface PrintDialogProps {
   onClose: () => void
   onPrint: (includeLogo: boolean, includeImages: boolean, pricingOptions?: PricingOptions) => void
   billboards?: Billboard[]
+  allowCardLayout?: boolean
 }
 
-export default function PrintDialog({ isOpen, onClose, onPrint, billboards = [] }: PrintDialogProps) {
-  const { t } = useTranslation()
+export default function PrintDialog({ isOpen, onClose, onPrint, billboards = [], allowCardLayout = false }: PrintDialogProps) {
+  const { t, i18n } = useTranslation()
+  const ar = i18n.language.startsWith('ar')
+  const [layout, setLayout] = useState<'table' | 'cards'>('table')
+  const [preparing, setPreparing] = useState(false)
+  const [previewHTML, setPreviewHTML] = useState('')
+  const [previewIndex, setPreviewIndex] = useState(0)
+  const [previewError, setPreviewError] = useState(false)
+  const [printError, setPrintError] = useState('')
   const [includeLogo, setIncludeLogo] = useState(true)
   const [includeImages, setIncludeImages] = useState(true)
   const [includePricing, setIncludePricing] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState('monthly')
   const [discounts, setDiscounts] = useState<{ [level: string]: { type: 'percentage' | 'fixed', value: number } }>({})
+
+  const previewSize = allowCardLayout && layout === 'cards' ? 1 : 10
+  const previewCount = Math.ceil(billboards.length / previewSize)
+  const currentPreview = Math.min(previewIndex, Math.max(0, previewCount - 1))
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    setPreviewHTML('')
+    setPreviewError(false)
+    const pricing = { includePricing, period: selectedPeriod, discounts }
+    const request = allowCardLayout && layout === 'cards' && billboards.length ? buildBillboardCardsHTML([billboards[currentPreview]], {
+      includeLogo, includeImages, ar, thumbnail: true,
+      pricing,
+    }) : buildTablePreview(billboards.slice(currentPreview * previewSize, (currentPreview + 1) * previewSize), includeLogo, includeImages, pricing, currentPreview * previewSize)
+    request.then(html => { if (!cancelled) setPreviewHTML(html) })
+      .catch(() => { if (!cancelled) setPreviewError(true) })
+    return () => { cancelled = true }
+  }, [isOpen, allowCardLayout, layout, billboards, currentPreview, previewSize, includeLogo, includeImages, includePricing, selectedPeriod, discounts, ar])
 
   // استخراج الفئات الفريدة من اللوحات المحددة
   const uniqueLevels = useMemo(() => {
@@ -91,14 +119,26 @@ export default function PrintDialog({ isOpen, onClose, onPrint, billboards = [] 
     }))
   }
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     const pricingOptions: PricingOptions = {
       includePricing,
       period: selectedPeriod,
       discounts
     }
-    onPrint(includeLogo, includeImages, pricingOptions)
-    onClose()
+    setPrintError('')
+    setPreparing(true)
+    try {
+      if (allowCardLayout && layout === 'cards') {
+        await printBillboardCards(billboards, { includeLogo, includeImages, pricing: pricingOptions, ar })
+      } else {
+        await onPrint(includeLogo, includeImages, pricingOptions)
+      }
+      onClose()
+    } catch (error) {
+      setPrintError(error instanceof Error ? error.message : (ar ? 'تعذر تجهيز الطباعة، حاول مجددًا.' : 'Unable to prepare printing. Please retry.'))
+    } finally {
+      setPreparing(false)
+    }
   }
 
   if (!isOpen) return null
@@ -109,12 +149,48 @@ export default function PrintDialog({ isOpen, onClose, onPrint, billboards = [] 
       onClick={onClose}
     >
       <div
-        className="bg-card border border-border rounded-lg p-6 max-w-2xl w-full gold-border-glow my-8 max-h-[90vh] overflow-y-auto"
+        className="bg-card border border-border rounded-lg p-4 sm:p-6 w-full gold-border-glow my-4 max-h-[90dvh] overflow-y-auto max-w-5xl grid grid-cols-1 md:grid-cols-[300px_minmax(0,1fr)] gap-6"
+        dir={ar ? 'rtl' : 'ltr'}
         onClick={(e) => e.stopPropagation()}
       >
+        {(
+          <aside className="md:sticky md:top-0 self-start rounded-xl border border-border bg-secondary/30 p-3" aria-label={ar ? 'معاينة الطباعة' : 'Print preview'}>
+            <p className="font-bold text-sm mb-3">{ar ? 'معاينة الصفحة' : 'Page preview'}</p>
+            <div className="mx-auto w-full max-w-[280px] aspect-[210/297] bg-white rounded shadow-sm overflow-hidden">
+              {previewHTML ? <iframe title={ar ? 'معاينة صفحة اللوحة' : 'Billboard page preview'} srcDoc={previewHTML} sandbox="" className="w-full h-full border-0 pointer-events-none" /> : <p role="status" className="p-4 text-sm text-gray-700">{previewError ? (ar ? 'تعذرت المعاينة؛ يمكنك متابعة الطباعة.' : 'Preview unavailable. You can still print.') : (ar ? 'جارٍ تجهيز المعاينة…' : 'Loading preview…')}</p>}
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-3">
+              <Button variant="outline" className="min-h-11" disabled={currentPreview === 0} onClick={() => setPreviewIndex(currentPreview - 1)}>{ar ? 'السابق' : 'Previous'}</Button>
+              <span className="text-xs" aria-live="polite">{billboards.length ? currentPreview + 1 : 0} / {previewCount}</span>
+              <Button variant="outline" className="min-h-11" disabled={currentPreview >= previewCount - 1} onClick={() => setPreviewIndex(currentPreview + 1)}>{ar ? 'التالي' : 'Next'}</Button>
+            </div>
+            {previewSize > 1 && <p className="text-xs text-muted-foreground mt-2">{ar ? 'معاينة مصغّرة: حتى 10 لوحات في العرض. يتحدد تقسيم صفحات الطباعة تلقائيًا.' : 'Thumbnail: up to 10 boards per view. Printed pagination is automatic.'}</p>}
+          </aside>
+        )}
+        <div className="min-w-0">
         <h3 className="text-2xl font-black text-foreground mb-6 text-center">
           {t('dialog.print_title')}
         </h3>
+
+        {allowCardLayout && (
+          <fieldset className="mb-5" disabled={preparing}>
+            <legend className="text-sm font-bold mb-2">{ar ? 'تنسيق الطباعة' : 'Print layout'}</legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(['table', 'cards'] as const).map(option => (
+                <label key={option} className={`p-3 rounded-md border-2 cursor-pointer ${layout === option ? 'border-primary bg-primary/10' : 'border-border'}`}>
+                  <span className="flex items-center gap-2 font-bold">
+                    <input type="radio" name="print-layout" value={option} checked={layout === option} onChange={() => setLayout(option)} />
+                    {option === 'table' ? (ar ? 'الجدول الحالي' : 'Table') : (ar ? 'بطاقات عرض اللوحات — جديد' : 'Presentation cards — new')}
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-2">
+                    {option === 'table' ? (ar ? 'قائمة مختصرة للمقارنة بين اللوحات.' : 'A compact list for comparing boards.') : (ar ? 'صفحة A4 بصورة كبيرة، المواصفات ورمز الموقع.' : 'An A4 page with a large photo, specifications and location QR.')}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">{ar ? `سيُطبع ${billboards.length} من اللوحات المختارة فقط` : `Prints only the ${billboards.length} selected boards`}{layout === 'cards' ? (ar ? ` — ${billboards.length} صفحة` : ` — ${billboards.length} pages`) : ''}</p>
+          </fieldset>
+        )}
         
         {/* خيار الشعار */}
         <p className="text-sm text-muted-foreground mb-2 font-bold">{t('dialog.header')}</p>
@@ -349,6 +425,7 @@ export default function PrintDialog({ isOpen, onClose, onPrint, billboards = [] 
           </div>
         )}
         
+        {printError && <p role="alert" className="text-red-500 text-sm mt-3">{printError}</p>}
         <div className="flex gap-4 sticky bottom-0 bg-card pt-4 border-t border-border mt-4">
           <Button
             onClick={onClose}
@@ -359,12 +436,14 @@ export default function PrintDialog({ isOpen, onClose, onPrint, billboards = [] 
           </Button>
           <Button
             onClick={handlePrint}
+            disabled={preparing || billboards.length === 0}
             className="flex-1 bg-gradient-to-r from-primary to-gold-dark hover:from-primary/90 hover:to-gold-dark/90 text-primary-foreground font-bold shadow-gold"
           >
             <FileDown className="w-5 h-5 ml-2" />
-            {t('dialog.print_report')}
+            {preparing ? (ar ? 'جارٍ تجهيز الطباعة…' : 'Preparing…') : allowCardLayout && layout === 'cards' ? (ar ? 'طباعة البطاقات' : 'Print cards') : t('dialog.print_report')}
           </Button>
         </div>
+      </div>
       </div>
     </div>
   )

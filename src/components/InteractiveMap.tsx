@@ -11,6 +11,7 @@ import MapSearchBar from "./map/MapSearchBar"
 import NavigationMode from "./map/NavigationMode"
 import LiveTrackingMode from "./map/LiveTrackingMode"
 import MapLayerSelector from "./map/MapLayerSelector"
+import LeafletMapComponent from "./map/LeafletMap"
 import { parseExpiryDate, getDaysRemaining, getStatusFromExpiry } from "@/utils/dateUtils"
 
 import { getSizeColor } from "@/hooks/useMapMarkers"
@@ -70,7 +71,7 @@ function MapStatusFilter({ billboards, filter, onFilterChange }: {
   ]
 
   return (
-    <div className="map-overlay-bottom absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 z-[1000] max-w-[calc(100vw-24px)]" style={{ direction: 'rtl' }}>
+    <div className="map-overlay-bottom absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 z-[1000] w-[calc(100%-24px)] sm:w-auto max-w-full" style={{ direction: 'rtl' }}>
       <div className="bg-card/95 backdrop-blur-md rounded-xl border border-border/50 shadow-lg p-1.5 md:p-2">
         <div className="flex items-center gap-1 md:gap-1.5 flex-nowrap overflow-x-auto scrollbar-hide">
           {statusButtons.map(btn => (
@@ -99,7 +100,7 @@ function MapStatusFilter({ billboards, filter, onFilterChange }: {
               }`}
             >
               <Filter className="w-3 h-3" />
-              <span className="hidden sm:inline">الأشهر</span>
+              <span>الأشهر</span>
             </button>
           )}
         </div>
@@ -241,9 +242,13 @@ function MapLegend({ billboards }: { billboards: Billboard[] }) {
 }
 
 
-// Lazy load map components
-const GoogleMapComponent = lazy(() => import("./map/GoogleMap"))
-const LeafletMapComponent = lazy(() => import("./map/LeafletMap"))
+// Optional Google Map loaded lazily with auto-retry
+const GoogleMapComponent = lazy(() =>
+  import("./map/GoogleMap").catch(error => {
+    console.error("Failed to load GoogleMap module, retrying...", error)
+    return import("./map/GoogleMap")
+  })
+)
 
 interface InteractiveMapProps {
   billboards: Billboard[]
@@ -834,7 +839,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
             
             {/* Provider Toggle - Bottom Left Corner */}
             {!isLiveTrackingMode && (
-              <div className="absolute bottom-3 left-3 z-[1000] origin-bottom-left">
+              <div className="absolute bottom-20 left-3 z-[1000] origin-bottom-left">
                 <MapProviderToggle provider={mapProvider} onToggle={toggleProvider} disabled={isTransitioning} />
               </div>
             )}
@@ -875,7 +880,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
             )}
 
             {/* Controls - Right Side - مدمجة على الجوال */}
-            <div className="absolute top-16 sm:top-2 md:top-4 right-3 md:right-4 flex flex-col gap-2 z-[1000]">
+            <div className="absolute top-16 sm:top-2 md:top-4 right-3 md:right-4 grid grid-cols-2 sm:flex sm:flex-col gap-2 z-[1000]">
               {/* Fullscreen Toggle */}
               <Button size="icon" variant="secondary" className="w-11 h-11 sm:w-11 sm:h-11 md:w-10 md:h-10 rounded-xl bg-card/95 backdrop-blur-md border border-border/50 shadow-lg hover:bg-card touch-manipulation" onClick={toggleFullscreen} title={isFullscreen ? 'تصغير' : 'ملء الشاشة'} aria-label={isFullscreen ? 'تصغير الخريطة' : 'فتح الخريطة بملء الشاشة'}>
                 {isFullscreen ? <Minimize className="w-4 h-4 md:w-5 md:h-5" /> : <Maximize className="w-4 h-4 md:w-5 md:h-5" />}
@@ -902,6 +907,8 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
                 }`} 
                 onClick={toggleLiveTracking} 
                 title="التتبع المباشر"
+                aria-label="التتبع المباشر"
+                aria-pressed={isLiveTrackingMode}
               >
                 <Radio className={`w-4 h-4 md:w-5 md:h-5 ${isLiveTrackingMode ? 'text-white' : ''}`} />
               </Button>
@@ -918,6 +925,8 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
                   }`} 
                   onClick={() => setIsNavigationMode(!isNavigationMode)} 
                   title="وضع الملاحة"
+                  aria-label="وضع الملاحة"
+                  aria-pressed={isNavigationMode}
                 >
                   <Navigation className={`w-4 h-4 md:w-5 md:h-5 ${isNavigationMode ? 'text-white' : ''}`} />
                 </Button>
@@ -934,6 +943,8 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
                 }`}
                 onClick={() => setShowSoussetOnly(prev => !prev)} 
                 title={showSoussetOnly ? 'إظهار جميع المقاسات' : 'إظهار لوحات السوسيت فقط'}
+                aria-label={showSoussetOnly ? 'إظهار جميع المقاسات' : 'إظهار لوحات السوسيت فقط'}
+                aria-pressed={showSoussetOnly}
               >
                 {showSoussetOnly 
                   ? <Eye className={`w-4 h-4 md:w-5 md:h-5 text-primary-foreground`} />

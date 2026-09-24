@@ -17,6 +17,13 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
+    include: [
+      'leaflet',
+      'leaflet.markercluster',
+      'react-leaflet',
+      'xlsx',
+      'qrcode',
+    ],
     exclude: ['lucide-react'],
   },
   resolve: {

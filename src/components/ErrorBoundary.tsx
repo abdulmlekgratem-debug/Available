@@ -21,6 +21,24 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('خطأ في التطبيق:', error, errorInfo)
+
+    // Handle chunk loading and dynamic import errors gracefully by reloading once
+    const msg = error?.message || ''
+    const isDynamicImportError =
+      msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('error loading dynamically imported module') ||
+      msg.includes('Loading chunk') ||
+      msg.includes('Outdated Optimize Dep')
+
+    if (isDynamicImportError && typeof window !== 'undefined') {
+      const storageKey = 'vite_retry_chunk_' + window.location.pathname
+      const lastRetry = sessionStorage.getItem(storageKey)
+      const now = Date.now()
+      if (!lastRetry || now - parseInt(lastRetry, 10) > 8000) {
+        sessionStorage.setItem(storageKey, String(now))
+        window.location.reload()
+      }
+    }
   }
 
   public render() {

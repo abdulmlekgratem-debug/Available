@@ -59,7 +59,7 @@ function MapLayerSelectorComponent({ currentLayer, onLayerChange, className = ''
       {isOpen && (
         <div
           ref={panelRef}
-          className="absolute top-0 right-full mr-2 z-[2000] animate-fade-in"
+          className="absolute top-full right-0 mt-2 sm:top-0 sm:right-full sm:mr-2 sm:mt-0 z-[2000] animate-fade-in"
           style={{ direction: 'rtl' }}
         >
           <div className="bg-card/95 backdrop-blur-xl rounded-2xl border border-border/50 shadow-2xl overflow-hidden w-[240px]">
