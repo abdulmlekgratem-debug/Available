@@ -88,7 +88,9 @@ function LeafletMapComponent({
       zoom: isMobile ? 7 : 8,
       zoomControl: false,
       attributionControl: true,
-      scrollWheelZoom: false,
+      scrollWheelZoom: true,
+      wheelDebounceTime: 40,
+      wheelPxPerZoomLevel: 80,
       maxZoom: 20,
       minZoom: 5
     })
@@ -100,7 +102,7 @@ function LeafletMapComponent({
     }
 
     // Add initial tile layer - Google Hybrid as default
-    const tileConfig = OSM_TILE_LAYERS.standard
+    const tileConfig = OSM_TILE_LAYERS['google-hybrid']
     tileLayerRef.current = L.tileLayer(tileConfig.url, {
       attribution: tileConfig.attribution,
       maxZoom: tileConfig.maxZoom || 20
@@ -272,6 +274,14 @@ function LeafletMapComponent({
       }
     }
   }, [])
+
+  // Apply interaction settings to an already mounted map as well.
+  useEffect(() => {
+    if (!isReady || !mapRef.current) return
+    mapRef.current.scrollWheelZoom.enable()
+    mapRef.current.touchZoom.enable()
+    mapRef.current.doubleClickZoom.enable()
+  }, [isReady])
 
   // Update drawing mode click handler
   useEffect(() => {
@@ -997,6 +1007,7 @@ function LeafletMapComponent({
   return (
     <><div
       ref={mapContainerRef} 
+      data-billboard-map="true"
       className="w-full h-full"
       style={{ background: '#1a1a2e' }}
     />{tileError && <div role="status" className="absolute top-32 left-3 right-3 z-[1001] rounded-xl bg-card p-3 shadow-lg"><p>تعذّر تحميل صور الخريطة. يمكنك مشاهدة اللوحات في القائمة أو تغيير طبقة الخريطة.</p><button className="min-h-11 underline" onClick={() => { tileErrors.current = 0; setTileError(false); tileLayerRef.current?.redraw() }}>إعادة المحاولة</button></div>}</>

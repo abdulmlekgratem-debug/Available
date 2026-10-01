@@ -8,7 +8,6 @@ import { MapProvider, MapPosition } from "@/types/map"
 import { MapPin, ZoomIn, ZoomOut, Download, PenTool, X, CheckCircle2, Maximize, Minimize, Navigation, Radio, EyeOff, Eye, ChevronDown, ChevronUp, Filter, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import MapSkeleton from "./MapSkeleton"
-import MapProviderToggle from "./map/MapProviderToggle"
 import MapSearchBar from "./map/MapSearchBar"
 import NavigationMode from "./map/NavigationMode"
 import LiveTrackingMode from "./map/LiveTrackingMode"
@@ -56,11 +55,12 @@ function MapStatusFilter({ billboards, filter, onFilterChange }: {
         const date = new Date(y, m)
         return { 
           key: `month-${key}`, 
+          timestamp: date.getTime(),
           label: date.toLocaleDateString('ar-LY', { month: 'short', year: 'numeric' }), 
           count 
         }
       })
-      .sort((a, b) => a.key.localeCompare(b.key))
+      .sort((a, b) => a.timestamp - b.timestamp)
       .slice(0, 6)
     
     return { available, soon, booked, total: billboards.length, months }
@@ -75,9 +75,9 @@ function MapStatusFilter({ billboards, filter, onFilterChange }: {
   ]
 
   return (
-    <div className="map-overlay-bottom absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 z-[1000] w-[calc(100%-24px)] sm:w-auto max-w-full" style={{ direction: 'rtl' }}>
+    <div className="map-overlay-bottom map-period-panel absolute bottom-3 md:bottom-4 left-3 z-[1000]" style={{ direction: 'rtl' }}>
       <div className="bg-card/95 backdrop-blur-md rounded-xl border border-border/50 shadow-lg p-1.5 md:p-2">
-        <div className="flex items-center gap-1 md:gap-1.5 flex-nowrap overflow-x-auto scrollbar-hide">
+        <div className="map-period-options">
           {statusButtons.map(btn => (
             <button
               key={btn.id}
@@ -91,7 +91,7 @@ function MapStatusFilter({ billboards, filter, onFilterChange }: {
             >
               <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${btn.color} flex-shrink-0 ${btn.id === 'available' && filter !== btn.id ? 'animate-pulse' : ''}`} />
               <span>{btn.label}</span>
-              <span className="opacity-60">({btn.count})</span>
+              <span className="map-period-count">{btn.count}</span>
             </button>
           ))}
           
@@ -110,18 +110,19 @@ function MapStatusFilter({ billboards, filter, onFilterChange }: {
         </div>
         
         {showMonths && counts.months.length > 0 && (
-          <div className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-border/30 flex-wrap max-w-[280px]">
+          <div className="map-month-options">
             {counts.months.map(m => (
               <button
                 key={m.key}
                 onClick={() => { onFilterChange(m.key); setShowMonths(false) }}
+                aria-pressed={filter === m.key}
                 className={`px-2 py-1 rounded-lg text-[10px] md:text-xs font-medium transition-all ${
                   filter === m.key
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'hover:bg-muted/60 text-foreground/80 bg-muted/30'
                 }`}
               >
-                {m.label} ({m.count})
+                <span>{m.label}</span><span className="map-period-count">{m.count}</span>
               </button>
             ))}
           </div>
@@ -271,7 +272,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
   const [mapProvider, setMapProvider] = useState<MapProvider>('openstreetmap')
   const [mapLoaded, setMapLoaded] = useState(false)
   const [showMap, setShowMap] = useState(false)
-  const [mapStyle, setMapStyle] = useState<string>('standard')
+  const [mapStyle, setMapStyle] = useState<string>('google-hybrid')
   const [activeLayer, setActiveLayer] = useState<string>('google-hybrid')
   const [isDrawingMode, setIsDrawingMode] = useState(false)
   const [drawingPoints, setDrawingPoints] = useState<MapPosition[]>([])
@@ -448,7 +449,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
     if (mapProvider === 'google' && googleMapRef.current) {
       googleMapRef.current.zoomIn()
     } else if (leafletMapRef.current) {
-      (leafletMapRef.current?.querySelector('.leaflet-container') as any)?.zoomIn?.()
+      (leafletMapRef.current.querySelector('[data-billboard-map]') as any)?._leafletMap?.zoomIn()
     }
   }
 
@@ -456,7 +457,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
     if (mapProvider === 'google' && googleMapRef.current) {
       googleMapRef.current.zoomOut()
     } else if (leafletMapRef.current) {
-      (leafletMapRef.current?.querySelector('.leaflet-container') as any)?.zoomOut?.()
+      (leafletMapRef.current.querySelector('[data-billboard-map]') as any)?._leafletMap?.zoomOut()
     }
   }
 
@@ -492,29 +493,21 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
     setFullscreen(!isFullscreen)
   }, [isFullscreen, setFullscreen])
 
-  // Lock body scroll when fullscreen
+  // Only lock and restore scroll when fullscreen was actually entered.
   useEffect(() => {
-    if (isFullscreen) {
-      document.body.style.overflow = 'hidden'
-      document.body.style.position = 'fixed'
-      document.body.style.width = '100%'
-      document.body.style.top = `-${window.scrollY}px`
-    } else {
-      const scrollY = document.body.style.top
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.width = ''
-      document.body.style.top = ''
-      window.scrollTo(0, parseInt(scrollY || '0') * -1)
-    }
+    if (!isFullscreen) return
+    const scrollPosition = window.scrollY
+    const body = document.body
+    const previous = { overflow: body.style.overflow, position: body.style.position, width: body.style.width, top: body.style.top }
+    body.style.overflow = 'hidden'
+    body.style.position = 'fixed'
+    body.style.width = '100%'
+    body.style.top = `-${scrollPosition}px`
     return () => {
-      document.body.style.overflow = ''
-      document.body.style.position = ''
-      document.body.style.width = ''
-      document.body.style.top = ''
+      Object.assign(body.style, previous)
+      window.scrollTo({ top: scrollPosition, behavior: 'instant' })
     }
   }, [isFullscreen])
-
   // Handle ESC key to exit fullscreen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -725,10 +718,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
               className={`absolute inset-0 transition-opacity duration-500 ease-out ${showMap ? 'opacity-100' : 'opacity-0'}`}
             >
               <Suspense fallback={
-                <MapSkeleton 
-                  onSwitchProvider={toggleProvider} 
-                  showSwitchButton={true}
-                  providerName={mapProvider === 'google' ? 'OpenStreetMap' : 'Google Maps'}
+                <MapSkeleton
                 />
               }>
                 {mapProvider === 'openstreetmap' ? (
@@ -764,7 +754,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
                     onToggleSelection={onToggleSelection}
                     onSelectMultiple={onSelectMultiple}
                     onImageView={onImageView}
-                    mapStyle={mapStyle}
+                    mapStyle={mapStyle === 'google-satellite' ? 'satellite' : mapStyle === 'standard' ? 'roadmap' : 'hybrid'}
                     isDrawingMode={isDrawingMode}
                     drawingPoints={drawingPoints}
                     onDrawingPointAdd={handleDrawingPointAdd}
@@ -787,10 +777,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
             {/* Loading State with Progress Bar - Only show when transitioning */}
             {(!showMap || isTransitioning) && (
               <div className={`absolute inset-0 transition-opacity duration-500 ease-out ${showMap && !isTransitioning ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                <MapSkeleton 
-                  onSwitchProvider={toggleProvider} 
-                  showSwitchButton={true}
-                  providerName={mapProvider === 'google' ? 'OpenStreetMap' : 'Google Maps'}
+                <MapSkeleton
                 />
               
               {/* Progress Bar */}
@@ -833,11 +820,6 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
             )}
             
             {/* Provider Toggle - Bottom Left Corner */}
-            {!isLiveTrackingMode && (
-              <div className="absolute bottom-20 left-3 z-[1000] origin-bottom-left">
-                <MapProviderToggle provider={mapProvider} onToggle={toggleProvider} disabled={isTransitioning} />
-              </div>
-            )}
             
             {/* Search Bar - Top Center - تصميم مختلف للموبايل */}
             {!isLiveTrackingMode && (

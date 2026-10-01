@@ -67,7 +67,7 @@ export const createPinSvgUrl = (size: string, status: string, isSelected: boolea
   const sizeLabel = size.length > 6 ? size.substring(0, 6) : size
   const fontSize = sizeLabel.length > 4 ? 7 : sizeLabel.length > 3 ? 8 : 9.5
 
-  const showDays = isSoon && daysRemaining !== null && daysRemaining !== undefined && daysRemaining > 0 && daysRemaining <= 90
+  const showDays = isSoon && daysRemaining !== null && daysRemaining !== undefined && daysRemaining > 0 && daysRemaining <= 20
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <defs>
@@ -81,7 +81,6 @@ export const createPinSvgUrl = (size: string, status: string, isSelected: boolea
   </defs>
 
   <!-- Shadow on ground -->
-  <ellipse cx="${cx}" cy="${h - 3}" rx="7" ry="2.5" fill="rgba(0,0,0,0.25)"/>
 
   ${isAvailable ? `
   <circle cx="${cx}" cy="${headCy}" r="${headR + 4}" fill="none" stroke="${statusColor}" stroke-width="1.5" opacity="0.3">
@@ -89,7 +88,7 @@ export const createPinSvgUrl = (size: string, status: string, isSelected: boolea
     <animate attributeName="opacity" values="0.4;0" dur="1.8s" repeatCount="indefinite"/>
   </circle>` : ''}
 
-  <g filter="url(#sh)">
+  <g>
     <!-- Teardrop body -->
     <path d="M${cx} ${tipY}
              C${cx - 5} ${tipY - 12}, ${cx - headR - 4} ${headCy + 10}, ${cx - headR - 4} ${headCy}
@@ -122,7 +121,7 @@ export const createPinSvgUrl = (size: string, status: string, isSelected: boolea
   ${showDays ? `
   <g>
     <rect x="${cx - 14}" y="${tipY - 2}" width="28" height="13" rx="6.5" fill="#FF9800" stroke="#fff" stroke-width="1"/>
-    <text x="${cx}" y="${tipY + 8}" text-anchor="middle" font-family="Manrope,sans-serif" font-size="7.5" font-weight="800" fill="#fff">${daysRemaining}d</text>
+    <text x="${cx}" y="${tipY + 8}" text-anchor="middle" font-family="Manrope,sans-serif" font-size="7.5" font-weight="800" fill="#fff">${daysRemaining} يوم</text>
   </g>` : ''}
 
   ${isSelected ? `
