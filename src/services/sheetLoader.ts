@@ -3,7 +3,8 @@
  * يتم تحميل الملف مرة واحدة فقط ثم تُقرأ الصفحات منه
  */
 
-import * as XLSX from 'xlsx'
+import type * as XLSX from 'xlsx'
+const loadXlsx = () => import('xlsx')
 
 const SHEET_URL = import.meta.env.VITE_SHEET_CSV_URL || "https://docs.google.com/spreadsheets/d/1adhOR9DcIiu4Q63EH--TdMinnUU3QtEp/export?format=csv&gid=0"
 const XLSX_URL = import.meta.env.VITE_SHEET_XLSX_URL || "https://docs.google.com/spreadsheets/d/1adhOR9DcIiu4Q63EH--TdMinnUU3QtEp/export?format=xlsx"
@@ -24,7 +25,7 @@ interface CachedData {
 /**
  * محاولة قراءة workbook من sessionStorage
  */
-function getFromCache(): XLSX.WorkBook | null {
+async function getFromCache(): Promise<XLSX.WorkBook | null> {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY)
     if (!raw) return null
@@ -34,10 +35,10 @@ function getFromCache(): XLSX.WorkBook | null {
       return null
     }
     if (cached.type === 'csv') {
-      return XLSX.read(cached.data, { type: 'string' })
+      return (await loadXlsx()).read(cached.data, { type: 'string' })
     }
     // XLSX as base64
-    return XLSX.read(cached.data, { type: 'base64' })
+    return (await loadXlsx()).read(cached.data, { type: 'base64' })
   } catch {
     return null
   }
@@ -82,7 +83,7 @@ async function fetchWorkbook(): Promise<XLSX.WorkBook> {
       if (buffer.byteLength > 500) {
         // حفظ كـ base64 في sessionStorage
         saveToCache('xlsx', arrayBufferToBase64(buffer))
-        return XLSX.read(buffer, { type: 'array' })
+        return (await loadXlsx()).read(buffer, { type: 'array' })
       }
     }
   } catch {
@@ -99,7 +100,7 @@ async function fetchWorkbook(): Promise<XLSX.WorkBook> {
       const csvText = await res.text()
       if (csvText.length > 100) {
         saveToCache('csv', csvText)
-        return XLSX.read(csvText, { type: 'string' })
+        return (await loadXlsx()).read(csvText, { type: 'string' })
       }
     }
   } catch {
@@ -118,7 +119,7 @@ async function fetchWorkbook(): Promise<XLSX.WorkBook> {
   }
   if (!res || !res.ok) throw new Error('فشل تحميل البيانات من جميع المصادر')
   const buffer = await res.arrayBuffer()
-  return XLSX.read(buffer, { type: 'array' })
+  return (await loadXlsx()).read(buffer, { type: 'array' })
 }
 
 /**
@@ -131,22 +132,17 @@ export async function getWorkbook(): Promise<XLSX.WorkBook> {
   // 2. منع تحميل متزامن
   if (loadPromise) return loadPromise
 
+  loadPromise = (async () => {
   // 3. من sessionStorage
-  const fromCache = getFromCache()
+  const fromCache = await getFromCache()
   if (fromCache) {
     cachedWorkbook = fromCache
     return fromCache
   }
 
-  // 4. تحميل جديد
-  loadPromise = fetchWorkbook().then(wb => {
-    cachedWorkbook = wb
-    loadPromise = null
-    return wb
-  }).catch(err => {
-    loadPromise = null
-    throw err
-  })
+  return fetchWorkbook()
+  })().then(wb => { cachedWorkbook = wb; return wb })
+    .finally(() => { loadPromise = null })
 
   return loadPromise
 }
@@ -161,7 +157,7 @@ export async function getSheet(index: number | string): Promise<any[]> {
     : wb.SheetNames[index]
   if (!sheetName) return []
   const ws = wb.Sheets[sheetName]
-  return XLSX.utils.sheet_to_json(ws, { defval: '' })
+  return (await loadXlsx()).utils.sheet_to_json(ws, { defval: '' })
 }
 
 /**

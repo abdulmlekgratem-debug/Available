@@ -71,7 +71,7 @@ export default function HeroSlider({ totalBillboards, billboards = [], theme, to
         onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
         onFocusCapture={() => setFocused(true)} onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false) }}>
         <div className="hero-slides" aria-hidden="true">
-          {slides.map((slide, i) => <div key={slide.src + i} className={'hero-slide' + (i === index ? ' is-active' : '')}><img src={slide.src} alt="" loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : 'auto'} onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = '/city/tripoli.jpg' }} /></div>)}
+          {slides.map((slide, i) => <div key={slide.src + i} className={'hero-slide' + (i === index ? ' is-active' : '')}><img src={i === index || i === (index + 1) % slides.length ? slide.src : undefined} alt="" loading={i === 0 ? 'eager' : 'lazy'} fetchPriority={i === 0 ? 'high' : 'auto'} onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = '/city/tripoli.jpg' }} /></div>)}
         </div>
         <div className="hero-scrim" />
         <div className="page-width hero-content-layout">

@@ -22,7 +22,7 @@ export async function openPrintPreview(build: () => Promise<string>, title: stri
     #print-controls{position:sticky;top:0;z-index:99999;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:#262626;color:#fff;padding:16px max(16px,env(safe-area-inset-right));box-shadow:0 3px 12px #0002;font:14px Arial,sans-serif;line-height:1.5}
     .print-heading{display:grid;gap:3px}.print-heading strong{font-size:17px}.print-heading span{font-size:12px;color:#dedede}.print-actions{display:flex;gap:10px;flex-wrap:wrap}
     #print-controls button{min-height:44px;padding:10px 18px;font:700 14px Arial,sans-serif;border-radius:12px;border:1px solid #ffffff60;cursor:pointer;background:transparent;color:white}#print-controls #print-save{background:#e8cc64;color:#262626;border-color:#e8cc64}#print-controls button:disabled{opacity:.5;cursor:wait}#print-controls button:focus-visible{outline:3px solid #e8cc64;outline-offset:3px}
-    .billboard-image{border-radius:8px}
+    .billboard-image,.qr-code{border-radius:0!important}
     @media screen{body{margin:0;background:#ececec}.table-report{max-width:210mm;margin:24px auto;padding:10mm;background:white;box-shadow:0 4px 24px #0002;overflow-x:auto}}
     @media(max-width:600px){#print-controls{gap:10px;padding:12px}.print-actions{width:100%}.print-actions button{flex:1}.table-report{margin:12px 0;padding:10px}}
     @media print{#print-controls{display:none!important}.table-report{margin:0;padding:0;box-shadow:none}}
@@ -62,7 +62,7 @@ export async function openPrintPreview(build: () => Promise<string>, title: stri
       report.append(...Array.from(parsed.body.childNodes))
       parsed.body.append(report)
     }
-    parsed.head.insertAdjacentHTML('beforeend', css)
+    parsed.head.insertAdjacentHTML('beforeend', '<link rel="icon" href="' + escapeHtml(new URL('/favicon-32.png?v=2', source.location.href).href) + '" type="image/png">' + css)
     parsed.body.insertAdjacentHTML('afterbegin', toolbar)
     popup.document.open()
     popup.document.write('<!doctype html>' + parsed.documentElement.outerHTML)

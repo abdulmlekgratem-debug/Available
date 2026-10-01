@@ -16,13 +16,15 @@ import SearchFilters from "@/components/SearchFilters"
 import BillboardCard from "@/components/BillboardCard"
 import MapSkeleton from "@/components/MapSkeleton"
 const InteractiveMap = lazy(() => import("@/components/InteractiveMap"))
-import PrintDialog, { PricingOptions } from "@/components/PrintDialog"
+import type { PricingOptions } from "@/components/PrintDialog"
+const PrintDialog = lazy(() => import("@/components/PrintDialog"))
 import { getPrice, formatPrice, calculateDiscountedPrice, RENTAL_PERIODS } from "@/services/pricingService"
 import MapSidePanel from "@/components/MapSidePanel"
 import ImageViewerModal from "@/components/ImageViewerModal"
 import Footer from "@/components/Footer"
-import StatsSection from "@/components/StatsSection"
-import ClientLogos from "@/components/ClientLogos"
+import DeferredSection from "@/components/DeferredSection"
+const StatsSection = lazy(() => import("@/components/StatsSection"))
+const ClientLogos = lazy(() => import("@/components/ClientLogos"))
 import UpdateNotice from "@/components/UpdateNotice"
 import DisplayModeToggle from "@/components/DisplayModeToggle"
 import HeroSlider from "@/components/HeroSlider"
@@ -284,13 +286,13 @@ export default function App() {
           th { background: #000000; color: #E8CC64; font-weight: 700; font-size: 8px; height: 30px; border: 1px solid #000000; padding: 4px 2px; }
           td { border: 1px solid #000000; padding: 2px; text-align: center; vertical-align: middle; background: #ffffff; color: #000; }
           td.number-cell { background: #E8CC64; padding: 2px; font-weight: 700; font-size: 9px; color: #000; width: 60px; }
-          td.image-cell { background: #ffffff; padding: 0; width: 90px; height: 64px; }
-          .billboard-image { width: auto; height: 64px; max-width: 100%; object-fit: contain; display: block; margin: 0 auto; border-radius: 0; }
+          td.image-cell { background: #ffffff; padding: 0; width: 90px; height: 64px; position: relative; }
+          .billboard-image { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; object-fit: contain; display: block; margin: 0; border-radius: 0 !important; }
           .billboard-number { color: #000; font-weight: 700; font-size: 9px; }
           .status-available { color: #16a34a; font-weight: 700; font-size: 8px; }
-          td.qr-cell { width: 60px; padding: 2px; vertical-align: middle; }
-          .qr-code { width: 100%; height: auto; max-height: 55px; display: block; margin: 0 auto; cursor: pointer; }
-          .qr-link { display: block; text-align: center; }
+          td.qr-cell { width: 60px; height: 64px; padding: 0; vertical-align: middle; position: relative; }
+          .qr-code { width: 100%; height: 100%; max-height: none; object-fit: contain; border-radius: 0 !important; display: block; cursor: pointer; }
+          .qr-link { position: absolute; inset: 0; display: block; text-align: center; }
           .image-placeholder { width: 100%; height: 55px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; font-size: 7px; color: #666; text-align: center; }
           @media print {
             body { print-color-adjust: exact; -webkit-print-color-adjust: exact; background: #ffffff !important; margin: 0 !important; }
@@ -352,7 +354,7 @@ export default function App() {
                   ? `<td style="font-size: 8px; padding: 2px; font-weight: 700; background: #f0f0f0;">${level}</td><td style="font-size: 8px; padding: 2px; font-weight: 600;">${price > 0 ? formatPrice(price) : '-'}</td><td style="font-size: 8px; padding: 2px; font-weight: 700; color: ${discountedPrice < price ? '#16a34a' : '#000'};">${discountedPrice > 0 ? formatPrice(discountedPrice) : '-'}</td>`
                   : `<td style="color: ${billboard.status === 'متاح' ? '#16a34a' : '#b45309'}; font-weight: 600; font-size: 8px;">${billboard.status === 'متاح' ? 'متاح' : formatExpiryDate(billboard.expiryDate)}</td>`
                 }
-                <td class="qr-cell" style="padding: 2px;">${qrCodes[billboard.id] ? `<a href="https://www.google.com/maps?q=${escapeHtml(billboard.coordinates)}" target="_blank" class="qr-link" title="اضغط لفتح الموقع"><img src="${qrCodes[billboard.id]}" class="qr-code" style="width: 50px; height: 50px; object-fit: contain;" alt="QR" /></a>` : '<span style="color: #999; font-size: 7px;">-</span>'}</td>
+                <td class="qr-cell">${qrCodes[billboard.id] ? `<a href="https://www.google.com/maps?q=${escapeHtml(billboard.coordinates)}" target="_blank" class="qr-link" title="اضغط لفتح الموقع"><img src="${qrCodes[billboard.id]}" class="qr-code"  alt="QR" /></a>` : '<span style="color: #999; font-size: 7px;">-</span>'}</td>
               </tr>`
             }).join("")}
           </tbody>
@@ -592,14 +594,15 @@ export default function App() {
           </aside>, document.body
         )}
 
-        <PrintDialog
+        <Suspense fallback={null}>
+        {showPrintDialog && <PrintDialog
           isOpen={showPrintDialog}
           onClose={() => setShowPrintDialog(false)}
           onPrint={(includeLogo, includeImages, pricingOptions) => handlePrint(includeLogo, includeImages, pricingOptions)}
           billboards={filteredBillboards}
-        />
+        />}
 
-        <PrintDialog
+        {showSelectedPrintDialog && <PrintDialog
           isOpen={showSelectedPrintDialog}
           allowCardLayout
           onClose={() => setShowSelectedPrintDialog(false)}
@@ -608,7 +611,8 @@ export default function App() {
             return handlePrint(includeLogo, includeImages, selectedData, pricingOptions)
           }}
           billboards={billboards.filter(b => selectedBillboards.has(b.id))}
-        />
+        />}
+        </Suspense>
 
 
 
@@ -755,8 +759,8 @@ export default function App() {
         onClose={() => setSelectedImage(null)}
       />
 
-      {!isMapFullscreen && !loading && <div className="page-width insights-section"><StatsSection billboards={billboards} sizeOrder={filters.sizes} municipalityOrder={filters.municipalities} id="stats-section" /></div>}
-      {!isMapFullscreen && <ClientLogos />}
+      {!isMapFullscreen && !loading && <DeferredSection><Suspense fallback={null}><div className="page-width insights-section"><StatsSection billboards={billboards} sizeOrder={filters.sizes} municipalityOrder={filters.municipalities} id="stats-section" /></div></Suspense></DeferredSection>}
+      {!isMapFullscreen && <DeferredSection><Suspense fallback={null}><ClientLogos /></Suspense></DeferredSection>}
       {!isMapFullscreen && <Footer id="footer" theme={theme} />}
 
       {/* Global MapSidePanel outside main stack context */}
