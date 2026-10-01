@@ -40,7 +40,7 @@ export function useProgressiveMarkers(
         billboard: b,
         lat: coords[0] || 0,
         lng: coords[1] || 0,
-        valid: coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])
+        valid: coords.length === 2 && coords.every(Number.isFinite) && Math.abs(coords[0]) <= 90 && Math.abs(coords[1]) <= 180
       }
     }).filter(b => b.valid)
   }, [billboards])

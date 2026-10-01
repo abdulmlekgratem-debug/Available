@@ -8,6 +8,10 @@
  */
 export const parseExpiryDate = (dateStr: string | null): Date | null => {
   if (!dateStr) return null
+  const validDate = (year: number, month: number, day: number): Date | null => {
+    const date = new Date(year, month - 1, day)
+    return year >= 2020 && year < 2100 && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null
+  }
 
   let trimmed = dateStr
     .toString()
@@ -17,7 +21,7 @@ export const parseExpiryDate = (dateStr: string | null): Date | null => {
   // YYYY-MM-DD أو YYYY/MM/DD
   if (/^\d{4}[/-]\d{1,2}[/-]\d{1,2}$/.test(trimmed)) {
     const [y, m, d] = trimmed.split(/[/-]/).map(Number)
-    if (y >= 2020 && y < 2100) return new Date(y, m - 1, d)
+    return validDate(y, m, d)
   }
 
   // DD/MM/YYYY أو DD-MM-YYYY
@@ -26,7 +30,7 @@ export const parseExpiryDate = (dateStr: string | null): Date | null => {
     const day = parts[0]
     const month = parts[1] - 1
     const year = parts[2]
-    if (year >= 2020 && year < 2100) return new Date(year, month, day)
+    return validDate(year, month + 1, day)
   }
 
   const fallback = new Date(trimmed)
@@ -62,12 +66,12 @@ export const formatExpiryDate = (dateStr: string | null): string => {
 /**
  * تحديد حالة اللوحة بناءً على تاريخ الانتهاء
  * متاح: متاح حالياً (لا يوجد عقد أو انتهى العقد days <= 0)
- * قريباً: متبقي من 1 إلى 30 يوماً
- * محجوز: متبقي أكثر من 30 يوماً
+ * قريباً: متبقي من 1 إلى 20 يوماً
+ * محجوز: متبقي أكثر من 20 يوماً
  */
 export const getStatusFromExpiry = (expiryDate: string | null): 'متاح' | 'قريباً' | 'محجوز' => {
   const days = getDaysRemaining(expiryDate)
   if (days === null || days <= 0) return 'متاح'
-  if (days <= 30) return 'قريباً'
+  if (days <= 20) return 'قريباً'
   return 'محجوز'
 }

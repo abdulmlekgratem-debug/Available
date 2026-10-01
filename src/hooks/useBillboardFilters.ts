@@ -3,10 +3,10 @@
  * يتولى حساب الخيارات، تطبيق الفلاتر، وإرجاع النتائج
  */
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useMemo } from "react"
 import i18n from "@/i18n"
 import { Billboard } from "@/types"
-import { parseExpiryDate } from "@/utils/dateUtils"
+import { matchesAvailability } from "@/utils/availability"
 
 interface NearbyLocation {
   lat: number
@@ -157,40 +157,16 @@ export function useBillboardFilters(billboards: Billboard[]): UseBillboardFilter
     const currentYear = now.getFullYear()
     const options: { value: string; label: string; count: number }[] = []
 
-    const tenDaysDate = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000)
-    const thirtyDaysDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-
-    // متاح الآن: إما متاح حصراً (إذا تم تفعيل استثناء قريباً) أو متاح + متبقي 10 أيام أو أقل
-    const availableCount = filteredBillboardsForMap.filter(b => {
-      const expiry = parseExpiryDate(b.expiryDate)
-      if (excludeSoonFromAvailable) {
-        return b.status === "متاح" && (!expiry || expiry <= now)
-      }
-      if (b.status === "متاح") return true
-      return expiry && expiry <= tenDaysDate
-    }).length
-    options.push({ value: "available", label: `${i18n.t('status.available')} (${availableCount})`, count: availableCount })
-
-    // قريباً: متبقي من 11 إلى 30 يوماً
-    const soonCount = filteredBillboardsForMap.filter(b => {
-      if (b.status === "متاح") return false
-      const expiry = parseExpiryDate(b.expiryDate)
-      return expiry && expiry > tenDaysDate && expiry <= thirtyDaysDate
-    }).length
-    options.push({ value: "soon", label: `${i18n.t('status.soon')} (${soonCount})`, count: soonCount })
+    const availableCount = filteredBillboardsForMap.filter(b => matchesAvailability(b, 'available', excludeSoonFromAvailable)).length
+    options.push({ value: 'available', label: (excludeSoonFromAvailable ? i18n.t('status.available') : i18n.language.startsWith('ar') ? 'متاح الآن وخلال 20 يومًا' : 'Available now & within 20 days') + ' (' + availableCount + ')', count: availableCount })
+    const soonCount = filteredBillboardsForMap.filter(b => matchesAvailability(b, 'soon')).length
+    options.push({ value: 'soon', label: i18n.t('status.soon') + ' (' + soonCount + ')', count: soonCount })
 
     const monthNames = (i18n.t('months', { returnObjects: true }) as string[]) || ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
     for (let i = 1; i <= 12; i++) {
       const targetMonth = (currentMonth + i) % 12
       const targetYear = currentYear + Math.floor((currentMonth + i) / 12)
-      const monthStart = new Date(targetYear, targetMonth, 1)
-      const monthEnd = new Date(targetYear, targetMonth + 1, 0)
-      const monthCount = filteredBillboardsForMap.filter(b => {
-        if (b.status === "متاح") return false
-        const expiry = parseExpiryDate(b.expiryDate)
-        if (expiry && expiry <= thirtyDaysDate) return false
-        return expiry && expiry >= monthStart && expiry <= monthEnd
-      }).length
+      const monthCount = filteredBillboardsForMap.filter(b => matchesAvailability(b, 'month-' + (targetMonth + 1) + '-' + targetYear)).length
       if (monthCount > 0) {
         options.push({
           value: `month-${targetMonth + 1}-${targetYear}`,
@@ -202,45 +178,9 @@ export function useBillboardFilters(billboards: Billboard[]): UseBillboardFilter
     return options
   }, [filteredBillboardsForMap, i18n.language, excludeSoonFromAvailable])
 
-  // Apply all filters (availability on top of the base filters already in filteredBillboardsForMap)
   const filteredBillboards = useMemo(() => {
-    let filtered = filteredBillboardsForMap
-
-    const isAllAvailability = selectedAvailability.includes("all") || selectedAvailability.length === 0
-    if (!isAllAvailability) {
-      const now = new Date()
-      const tenDaysDate = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000)
-      const thirtyDaysDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-      
-      filtered = filtered.filter(b => {
-        return selectedAvailability.some(period => {
-          const expiry = parseExpiryDate(b.expiryDate)
-          if (period === "available") {
-            if (excludeSoonFromAvailable) {
-              return b.status === "متاح" && (!expiry || expiry <= now)
-            }
-            return b.status === "متاح" || (expiry && expiry <= tenDaysDate)
-          }
-          if (b.status === "متاح") return false
-          if (!expiry) return false
-          if (period === "soon") {
-            return expiry > tenDaysDate && expiry <= thirtyDaysDate
-          }
-          if (period.startsWith("month-")) {
-            if (expiry <= thirtyDaysDate) return false
-            const parts = period.split("-")
-            const targetMonth = parseInt(parts[1]) - 1
-            const targetYear = parseInt(parts[2])
-            const monthStart = new Date(targetYear, targetMonth, 1)
-            const monthEnd = new Date(targetYear, targetMonth + 1, 0)
-            return expiry >= monthStart && expiry <= monthEnd
-          }
-          return false
-        })
-      })
-    }
-
-    return filtered
+    if (!selectedAvailability.length || selectedAvailability.includes('all')) return filteredBillboardsForMap
+    return filteredBillboardsForMap.filter(b => selectedAvailability.some(period => matchesAvailability(b, period, excludeSoonFromAvailable)))
   }, [filteredBillboardsForMap, selectedAvailability, excludeSoonFromAvailable])
 
   return {

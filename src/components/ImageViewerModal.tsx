@@ -12,9 +12,39 @@ export default function ImageViewerModal({ imageUrl, onClose }: ImageViewerModal
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
   const lastTouchDistanceRef = useRef<number | null>(null)
   const pointerDownPos = useRef({ x: 0, y: 0 })
   const hasDragged = useRef(false)
+
+  useEffect(() => {
+    if (!imageUrl) return
+    const previousFocus = document.activeElement as HTMLElement | null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    closeRef.current?.focus()
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') || [])
+      const first = controls[0]
+      const last = controls[controls.length - 1]
+      if (!first || !last) return
+      if (event.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && (document.activeElement === last || !dialogRef.current?.contains(document.activeElement))) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', trapFocus)
+    return () => {
+      document.removeEventListener('keydown', trapFocus)
+      document.body.style.overflow = previousOverflow
+      if (previousFocus?.isConnected) previousFocus.focus()
+    }
+  }, [imageUrl])
 
   // Reset zoom & position when image changes or opens
   useEffect(() => {
@@ -169,6 +199,10 @@ export default function ImageViewerModal({ imageUrl, onClose }: ImageViewerModal
 
   return (
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="معاينة صورة اللوحة"
       className="fixed inset-0 bg-black/95 z-[1000002] backdrop-blur-xl flex items-center justify-center p-2 select-none animate-fade-in"
       style={{ touchAction: 'none' }}
       onClick={() => {
@@ -195,6 +229,7 @@ export default function ImageViewerModal({ imageUrl, onClose }: ImageViewerModal
           disabled={scale >= 4}
           className="w-8 h-8 rounded-full bg-primary/10 hover:bg-primary/25 active:scale-95 text-primary border border-primary/30 flex items-center justify-center transition-all disabled:opacity-40"
           title="تكبير (+)"
+          aria-label="تكبير الصورة"
         >
           <ZoomIn className="w-4 h-4" />
         </button>
@@ -205,6 +240,7 @@ export default function ImageViewerModal({ imageUrl, onClose }: ImageViewerModal
           onClick={handleReset}
           className="px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700 text-xs font-black text-white hover:text-primary transition-all font-mono active:scale-95 flex items-center gap-1"
           title="إعادة التعيين إلى 100%"
+          aria-label="إعادة حجم الصورة إلى 100%"
         >
           <span>{Math.round(scale * 100)}%</span>
           {scale > 1 && <RotateCcw className="w-3 h-3 text-primary animate-spin-once" />}
@@ -217,6 +253,7 @@ export default function ImageViewerModal({ imageUrl, onClose }: ImageViewerModal
           disabled={scale <= 1}
           className="w-8 h-8 rounded-full bg-primary/10 hover:bg-primary/25 active:scale-95 text-primary border border-primary/30 flex items-center justify-center transition-all disabled:opacity-40"
           title="تصغير (-)"
+          aria-label="تصغير الصورة"
         >
           <ZoomOut className="w-4 h-4" />
         </button>
@@ -225,10 +262,12 @@ export default function ImageViewerModal({ imageUrl, onClose }: ImageViewerModal
 
         {/* Close Button */}
         <button
+          ref={closeRef}
           type="button"
           onClick={onClose}
           className="w-8 h-8 rounded-full bg-destructive/20 hover:bg-destructive active:scale-95 text-white border border-destructive/40 flex items-center justify-center transition-all shadow-lg"
           title="إغلاق (ESC)"
+          aria-label="إغلاق معاينة الصورة"
         >
           <X className="w-4 h-4 stroke-[3]" />
         </button>

@@ -1,4 +1,4 @@
-import { MapPin, Navigation, Check, Plus, Ruler, Layers, Copy, Clock } from "lucide-react"
+import { Navigation, Check, Plus, Ruler, Layers, Copy, Clock } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Billboard } from "@/types"
@@ -64,7 +64,7 @@ export default function BillboardCard({
   const effectiveStatus = billboard.expiryDate ? getStatusFromExpiry(billboard.expiryDate) : (billboard.status || 'متاح')
   const status = effectiveStatus === 'متاح' ? 'available' : effectiveStatus === 'قريباً' ? 'soon' : 'rented'
 
-  const statusLabel = status === 'available'
+  const statusLabel = status === 'soon' && days !== null ? (ar ? 'سيتاح بعد ' + days + ' يوم' : 'Available in ' + days + ' days') : status === 'available'
     ? t('status.available')
     : status === 'soon'
       ? t('status.soon')
@@ -170,7 +170,7 @@ export default function BillboardCard({
           {/* Days Remaining Countdown in Center of Image Bottom */}
           {days !== null && days > 0 ? (
             <span
-              className={`card-badge card-badge-days ${days <= 30 ? 'is-soon' : 'is-rented'}`}
+              className={`card-badge card-badge-days ${days <= 20 ? 'is-soon' : 'is-rented'}`}
               title={ar ? `متبقي ${days} يوم حتى انتهاء الحجز` : `${days} days left`}
             >
               <Clock size={11} className="flex-shrink-0" />
@@ -195,46 +195,18 @@ export default function BillboardCard({
       <div className="catalog-card-body">
         <h3 title={location}>{location}</h3>
 
-        <div className="catalog-location">
-          <MapPin size={14} className="flex-shrink-0 text-primary" />
-          {billboard.city && (
-            <button
-              type="button"
-              onClick={() => onFilterByCity?.(billboard.city)}
-              disabled={!onFilterByCity}
-              title={ar ? `تصفية حسب المدينة: ${billboard.city}` : `Filter by city: ${billboard.city}`}
-            >
-              {billboard.city}
+        <div className="catalog-location" aria-label={ar ? 'المنطقة والبلدية والمدينة' : 'Area, municipality and city'}>
+          {[
+            { value: billboard.area, label: ar ? 'المنطقة' : 'Area', handler: onFilterByArea },
+            { value: billboard.municipality, label: ar ? 'البلدية' : 'Municipality', handler: onFilterByMunicipality },
+            { value: billboard.city, label: ar ? 'المدينة' : 'City', handler: onFilterByCity },
+          ].filter((field, index, fields) => field.value && !fields.slice(0, index).some(previous => previous.value === field.value)).map(field => (
+            <button key={field.label} type="button" onClick={() => field.handler?.(field.value)} disabled={!field.handler}
+              title={`${field.label}: ${field.value}`} aria-label={`${field.label}: ${field.value}`}>
+              {field.value}
             </button>
-          )}
-          {billboard.municipality && billboard.municipality !== billboard.city && (
-            <>
-              <span>·</span>
-              <button
-                type="button"
-                onClick={() => onFilterByMunicipality?.(billboard.municipality)}
-                disabled={!onFilterByMunicipality}
-                title={ar ? `تصفية حسب البلدية: ${billboard.municipality}` : `Filter by municipality: ${billboard.municipality}`}
-              >
-                {billboard.municipality}
-              </button>
-            </>
-          )}
-          {billboard.area && billboard.area !== billboard.city && billboard.area !== billboard.municipality && (
-            <>
-              <span>·</span>
-              <button
-                type="button"
-                onClick={() => onFilterByArea?.(billboard.area)}
-                disabled={!onFilterByArea}
-                title={ar ? `تصفية حسب المنطقة: ${billboard.area}` : `Filter by area: ${billboard.area}`}
-              >
-                {billboard.area}
-              </button>
-            </>
-          )}
+          ))}
         </div>
-
         {/* Single Focused Action */}
         <div className="catalog-card-actions">
           <button

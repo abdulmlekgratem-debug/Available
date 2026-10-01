@@ -8,7 +8,7 @@ const SelectContext = React.createContext<{
   value: string
   onValueChange: (value: string) => void
   isOpen: boolean
-  setIsOpen: (open: boolean) => void
+  setIsOpen: React.Dispatch<React.SetStateAction<boolean>>
   searchable?: boolean
   searchTerm: string
   setSearchTerm: (val: string) => void

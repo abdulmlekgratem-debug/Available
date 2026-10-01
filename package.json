@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "test": "node tests/availability.test.cjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "desktop:build": "node desktop/build.cjs",

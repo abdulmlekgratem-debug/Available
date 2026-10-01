@@ -163,7 +163,7 @@ export function useMapMarkers(
 ): MarkerData[] {
   return useMemo(() => {
     return billboards
-      .map((billboard) => {
+      .map((billboard): MarkerData | null => {
         const position = parseBillboardCoordinates(billboard.coordinates)
         if (!position) return null
         const isSelected = selectedBillboards?.has(billboard.id) || false

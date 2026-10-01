@@ -447,7 +447,7 @@
   text-align: start;
 }
 .catalog-location button:hover {
-  text-decoration: underline;
+  text-decoration: none;
   color: hsl(var(--foreground));
 }
 
@@ -696,3 +696,94 @@
 .catalog-preview { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; font-size: 12px; color: hsl(var(--muted-foreground)); border-radius: 8px; }
 .catalog-preview:hover { background: hsl(var(--secondary)); }
 .catalog-image-button:focus-visible { outline-offset: -5px !important; }
+
+/* Progressive disclosure keeps the catalogue close to mobile search. */
+.search-disclosure > summary, .availability-disclosure > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 10px; font-weight: 700; color: hsl(var(--foreground)); }
+.search-disclosure { margin-top: 12px; border-top: 1px solid hsl(var(--border)); }
+.search-disclosure .search-advanced { border-top: 0; margin-top: 0; padding-top: 8px; }
+.availability-disclosure:not([open]) { padding-block: 8px; }
+.availability-disclosure[open] > summary { margin-bottom: 16px; }
+.search-disclosure > summary::after, .availability-disclosure > summary::after { content: '+'; margin-inline-start: auto; }
+.search-disclosure[open] > summary::after, .availability-disclosure[open] > summary::after { content: '−'; }
+.catalog-card-actions button, .catalog-pagination button, .catalog-top-pagination button, .quiet-button, .view-switch button, .catalog-density button, [role="dialog"] button { min-height: 44px; min-width: 44px; }
+.catalog-location { flex-wrap: wrap; white-space: normal; gap: 4px 8px; }
+.catalog-location button { padding-inline: 4px; }
+.catalog-checkbox { min-height: 44px; cursor: pointer; }
+.catalog-checkbox input { width: 20px; height: 20px; }
+@media (max-width: 767px) { .catalog-search .search-surface { padding: 16px; } .catalog-card .card-badge-specs { padding-block: 0; } .catalog-card .card-bottom-overlay { gap: 6px; } .catalog-card .card-code-btn { font-size: 10px; padding-inline: 6px; } }
+
+.availability-current { font-size: 12px; color: hsl(var(--muted-foreground)); font-weight: 500; }
+
+.client-showcase { padding-block: 16px 24px; }
+.client-showcase-heading { text-align: start; margin: 0 0 16px; padding-inline-start: 12px; border-inline-start: 3px solid hsl(var(--primary)); }
+.client-showcase-heading > span { display: inline-block; font-size: 12px; font-weight: 600; color: hsl(var(--muted-foreground)); margin-bottom: 8px; }
+.client-showcase-heading h2 { font-family: Tajawal, Arial, sans-serif; font-size: 22px; font-weight: 700; line-height: 1.5; color: hsl(var(--foreground)); margin: 0; }
+.client-showcase-heading p { font-size: 14px; line-height: 1.8; color: hsl(var(--muted-foreground)); }
+.client-logo-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 12px; margin-inline: auto; }
+.client-logo-tile { margin: 0; min-width: 0; padding: 12px; border: 1px solid hsl(var(--border) / .65); background: hsl(var(--card)); border-radius: 8px; text-align: center; transition: border-color .18s; }
+.client-logo-tile:hover { border-color: hsl(var(--primary) / .5); }
+.client-logo-image { height: 60px; display: flex; align-items: center; justify-content: center; padding: 4px; background: #fff; border-radius: 6px; }
+.client-logo-image img { display: block; width: 150px; height: 48px; max-width: 100%; object-fit: contain; object-position: center; }
+.client-logo-tile figcaption { margin-top: 6px; font-size: 12px; font-weight: 600; line-height: 1.5; color: hsl(var(--foreground)); overflow-wrap: break-word; }
+.client-logo-loading { height: 140px; background: hsl(var(--muted)); }
+@media (max-width: 900px) { .client-logo-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@media (max-width: 540px) { .client-showcase { padding-block: 20px; } .client-logo-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; } .client-logo-tile { padding: 8px; } .client-logo-image { height: 40px; } .client-logo-image img { width: 88px; height: 28px; } }
+
+.stats-overview { border: 1px solid hsl(var(--border)); border-radius: 16px; padding: 20px; background: hsl(var(--card)); }
+.stats-overview-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.stats-overview-heading h3 { font-size: 18px; font-weight: 700; color: hsl(var(--foreground)); margin: 0; }
+.stats-details-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 12px; font-size: 13px; border-radius: 9px; border: 1px solid hsl(var(--primary) / .35); background: hsl(var(--primary) / .08); color: hsl(var(--foreground)); }
+.stats-details-toggle:hover { background: hsl(var(--primary) / .18); }
+.stats-details-toggle:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+.stats-metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 16px; }
+.stats-metric { display: flex; flex-direction: column; gap: 7px; padding-inline-start: 16px; border-inline-start: 2px solid hsl(var(--primary) / .4); }
+.stats-metric strong { font-family: Manrope, sans-serif; font-size: 28px; font-weight: 700; line-height: 1.2; color: hsl(var(--foreground)); }
+.stats-metric span { color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.6; }
+@media (max-width: 640px) { .stats-overview { padding: 16px; } .stats-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 12px; } .stats-overview-heading h3 { font-size: 16px; } .stats-metric strong { font-size: 25px; } }
+
+.availability-toolbar { padding: 18px; border: 1px solid hsl(var(--border)); border-radius: 18px; background: hsl(var(--card)); margin-block: 16px; }
+.availability-heading h3 { color: hsl(var(--foreground)); }
+.availability-range { padding: 5px; border-radius: 12px; background: hsl(var(--background)); transition: border-color .18s, box-shadow .18s; }
+.availability-range:hover { border-color: hsl(var(--primary) / .55); }
+.availability-range.is-active { border-color: hsl(var(--primary)); box-shadow: 0 0 0 1px hsl(var(--primary) / .2); background: hsl(var(--primary) / .08); }
+.availability-range-filter { min-height: 52px; padding: 9px 10px; line-height: 1.6; }
+.availability-range-filter strong { font-size: 18px; background: hsl(var(--muted)); color: hsl(var(--foreground)); border-radius: 8px; padding: 3px 8px; min-width: 36px; text-align: center; }
+.availability-range-filter[aria-pressed="true"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.availability-range-filter[aria-pressed="true"] strong { background: hsl(var(--primary-foreground) / .12); color: inherit; }
+.availability-range-select { color: hsl(var(--muted-foreground)); font-size: 12px; gap: 7px; }
+.availability-range-select bdi { font-size: 11px; }
+.availability-range-select:hover, .availability-range-select[aria-pressed="true"] { background: hsl(var(--primary) / .12); color: hsl(var(--foreground)); }
+.availability-range-select:disabled { opacity: .4; cursor: not-allowed; }
+.availability-toolbar button:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+
+/* Keep card typography readable without stretching every small badge. */
+.catalog-card-body { padding: 16px; gap: 10px; }
+.catalog-card h3 { font-size: 16px; line-height: 1.65; max-height: none; min-height: 0; overflow-wrap: break-word; }
+.catalog-location { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; font-size: 13px; line-height: 1.6; overflow: visible; gap: 6px; }
+.catalog-location button { display: inline-flex; align-items: center; padding: 5px 9px; white-space: normal; min-width: 0; max-width: 100%; text-align: start; color: hsl(var(--foreground)); font-weight: 500; background: hsl(var(--muted) / .55); border: 1px solid hsl(var(--border) / .6); border-radius: 7px; line-height: 1.5; }
+.catalog-location button:first-child { color: hsl(var(--foreground)); font-weight: 700; background: hsl(var(--primary) / .1); border-color: hsl(var(--primary) / .22); }
+.catalog-location button { transition: background-color .15s, border-color .15s; }
+.catalog-location button:not(:disabled):hover { background: hsl(var(--primary) / .14); border-color: hsl(var(--primary) / .4); text-decoration: none; }
+.catalog-location button:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+.catalog-map-toggle { min-width: 160px; background: #d6ac40; border-color: #b68e2e; color: #181818; font-size: 15px; font-weight: 800; box-shadow: 0 2px 6px rgb(0 0 0 / .08); }
+.catalog-map-toggle:hover { background: #e4bb54; border-color: #b68e2e; }
+.catalog-map-toggle[aria-pressed="true"] { background: hsl(var(--foreground)); border-color: hsl(var(--foreground)); color: hsl(var(--background)); }
+.catalog-map-toggle:focus-visible { outline: 2px solid hsl(var(--foreground)); outline-offset: 3px; }
+.catalog-location svg { align-self: center; }
+.card-top-overlay { align-items: flex-start; }
+.card-badges-group { min-width: 0; gap: 6px; }
+.catalog-status { line-height: 1.5; white-space: nowrap; }
+.card-select-btn { flex-shrink: 0; min-height: 36px; }
+.card-bottom-overlay { flex-wrap: wrap; align-items: center; gap: 6px; }
+.card-badge-specs { line-height: 1.5; flex-wrap: wrap; border-radius: 8px; }
+.card-code-btn { flex-shrink: 0; min-height: 32px; }
+.card-badge-days { white-space: nowrap; }
+@media (max-width: 767px) {
+  .catalog-card-body { padding: 12px; gap: 8px; }
+  .catalog-card h3 { font-size: 15px; }
+  .catalog-location { font-size: 12px; }
+  .card-top-overlay { inset-inline: 7px; gap: 5px; }
+  .card-badges-group { flex-direction: column; align-items: flex-start; }
+}
+
+.availability-simple { margin-block: 16px; } .availability-simple p { font-size: 14px; line-height: 1.8; color: hsl(var(--muted-foreground)); margin-bottom: 10px; } .availability-simple > div { display: flex; flex-wrap: wrap; gap: 8px; } .availability-simple button { min-height: 44px; border: 1px solid hsl(var(--border)); padding: 8px 14px; border-radius: 12px; font-size: 13px; background: hsl(var(--card)); } .availability-simple button[aria-pressed="true"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-weight: 700; } #map-section button { min-height: 44px; }

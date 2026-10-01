@@ -35,7 +35,20 @@
     "booked": "Booked",
     "rented": "Rented"
   },
-  "months": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+  "months": [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+  ],
   "nav": {
     "home": "Home",
     "billboards": "Billboards",
@@ -137,7 +150,9 @@
     "rights": "© 2026 Golden Faris Advertising Company — All rights reserved",
     "brand_name": "Golden Faris",
     "disclaimer": "This catalog is dedicated to presenting real-time availability of billboards managed by Golden Faris Advertising.",
-    "cta_whatsapp_msg": "Hello, I would like to inquire about billboard availability and rates"
+    "cta_whatsapp_msg": "Hello, I would like to inquire about billboard availability and rates",
+    "about_link": "Company & services",
+    "guide_link": "Choosing and booking a billboard"
   },
   "search": {
     "badge": "Search & Filters",

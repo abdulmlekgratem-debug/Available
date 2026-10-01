@@ -12,4 +12,5 @@ Allow: /
 
 Sitemap: https://glkn.ly/sitemap.xml
 
-Host: https://glkn.ly
+User-agent: OAI-SearchBot
+Allow: /

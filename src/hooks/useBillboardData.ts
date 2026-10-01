@@ -6,7 +6,8 @@
 import { useState, useEffect } from "react"
 import { Billboard } from "@/types"
 import { loadBillboardsFromExcel } from "@/services/billboardService"
-import { loadPricingFromExcel } from "@/services/pricingService"
+import { loadPricingFromExcel, clearPricingCache } from "@/services/pricingService"
+import { clearWorkbookCache } from '@/services/sheetLoader'
 
 interface UseBillboardDataReturn {
   billboards: Billboard[]
@@ -22,6 +23,7 @@ export function useBillboardData(): UseBillboardDataReturn {
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
+    let active = true
     const loadWithTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
       const timeoutPromise = new Promise<T>((_, reject) =>
         setTimeout(() => reject(new Error('Timeout')), timeoutMs)
@@ -43,6 +45,7 @@ export function useBillboardData(): UseBillboardDataReturn {
           loadWithTimeout(loadBillboardsFromExcel(), 20000, []),
           loadWithTimeout(loadPricingFromExcel(), 15000, undefined),
         ])
+        if (!active) return
 
         if (data.length > 0) {
           setBillboards(data)
@@ -50,18 +53,19 @@ export function useBillboardData(): UseBillboardDataReturn {
           setLoadError(true)
         }
       } catch (error) {
+        if (!active) return
         console.error('[useBillboardData] خطأ في التحميل:', error)
         setLoadError(true)
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     }
 
     const timer = setTimeout(loadData, 100)
-    return () => clearTimeout(timer)
+    return () => { active = false; clearTimeout(timer) }
   }, [reloadKey])
 
-  const reload = () => setReloadKey(k => k + 1)
+  const reload = () => { clearWorkbookCache(); clearPricingCache(); setReloadKey(k => k + 1) }
 
   return { billboards, loading, loadError, reload }
 }

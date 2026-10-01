@@ -10,7 +10,7 @@ export const createCompactPopupContent = (billboard: Billboard): string => {
   const daysRemaining = getDaysRemaining(billboard.expiryDate)
   const effectiveStatus = billboard.expiryDate ? getStatusFromExpiry(billboard.expiryDate) : (billboard.status || 'متاح')
   const statusKey = effectiveStatus === 'متاح' ? 'available' : effectiveStatus === 'قريباً' ? 'soon' : 'rented'
-  const statusLabel = effectiveStatus === 'متاح' ? 'متاح' : effectiveStatus === 'قريباً' ? 'قريباً' : 'محجوز'
+  const statusLabel = effectiveStatus === 'متاح' ? 'متاح الآن' : effectiveStatus === 'قريباً' ? 'سيتاح بعد ' + daysRemaining + ' يوم' : 'محجوز حاليًا'
   const location = billboard.landmark || billboard.location || billboard.city
 
   const coords = billboard.coordinates.split(",").map((c) => Number.parseFloat(c.trim()))
@@ -82,7 +82,7 @@ export const createCompactPopupContent = (billboard: Billboard): string => {
           ` : '<div></div>'}
 
           ${daysRemaining !== null && daysRemaining > 0 ? `
-            <span class="card-badge card-badge-days ${daysRemaining <= 30 ? 'is-soon' : 'is-rented'}" style="font-size: 10px; padding: 2px 8px; border-radius: 9999px; color: #ffffff !important;">
+            <span class="card-badge card-badge-days ${daysRemaining <= 20 ? 'is-soon' : 'is-rented'}" style="font-size: 10px; padding: 2px 8px; border-radius: 9999px; color: #ffffff !important;">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display: inline-block; vertical-align: middle; margin-inline-end: 3px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               <span style="color: #ffffff !important;">متبقي ${daysRemaining} يوم</span>
             </span>

@@ -23,7 +23,7 @@ function convertGoogleDriveUrl(url: string): string {
 
 export async function loadCitySlides(): Promise<CitySlide[]> {
   try {
-    const rows = await getSheet(2)
+    const rows = await getSheet('المدن')
     const slides = rows
       .map((row: any) => ({
         cityName: (row['اسم العنصر'] || row['اسم المدينة'] || '').toString().trim(),
@@ -43,7 +43,7 @@ export async function loadCitySlides(): Promise<CitySlide[]> {
 
 export async function loadClientLogos(): Promise<ClientLogo[]> {
   try {
-    const rows = await getSheet(3)
+    const rows = await getSheet('الشركات')
     const logos = rows
       .map((row: any) => ({
         logoUrl: convertGoogleDriveUrl((row['الرابط المباشر'] || row['رابط شعار الشركة'] || '').toString().trim()),

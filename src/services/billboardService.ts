@@ -39,7 +39,7 @@ export async function loadBillboardsFromExcel(): Promise<Billboard[]> {
         const city = (row['مدينة'] || row['المدينة'] || 'غير محدد').toString().trim()
         const area = (row['منطقة'] || row['المنطقة'] || municipality).toString().trim()
         const size = (row['حجم'] || row['الحجم'] || row['المقاس مع الدغاية'] || '12X4').toString().trim()
-        const coordinates = row['احداثي - GPS'] || row['الإحداثيات GPS'] || '32.8872,13.1913'
+        const coordinates = row['احداثي - GPS'] || row['الإحداثيات GPS'] || ''
 
         let imageUrl = row['image_url'] || row['@IMAGE'] || '/roadside-billboard.png'
         if (imageUrl.includes('drive.google.com')) {

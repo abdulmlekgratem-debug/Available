@@ -42,12 +42,16 @@ export const SIZE_MAP: Record<string, number> = {
 
 let PRICING_DATA: Record<string, Record<string, Record<number, PriceEntry>>> = {}
 let pricingLoaded = false
+export function clearPricingCache() {
+  pricingLoaded = false
+  PRICING_DATA = {}
+}
 
 export async function loadPricingFromExcel(): Promise<void> {
   if (pricingLoaded) return
 
   try {
-    const pricesData = await getSheet(1)
+    const pricesData = await getSheet('الأسعار')
     if (!pricesData.length) {
       loadDefaultPricing()
       return

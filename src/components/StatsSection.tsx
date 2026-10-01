@@ -1,35 +1,28 @@
+import { availabilityStatus } from '@/utils/availability'
 /**
  * مكون الإحصائيات السريعة - Stats Section Component
  * يعرض إحصائيات اللوحات المتاحة والقريبة حسب المقاس والبلدية بتصميم لوحة مؤشرات فاخرة
  */
 
 import { useState } from "react"
-import { useTranslation } from "react-i18next"
-import { ChevronDown, ChevronUp, BarChart3, Building2, Ruler, MapPin, Sparkles, TrendingUp } from "lucide-react"
+import { ChevronDown, ChevronUp, Building2, Ruler, MapPin } from "lucide-react"
 import { Billboard } from "@/types"
-import { parseExpiryDate } from "@/utils/dateUtils"
 
 interface StatsSectionProps {
   billboards: Billboard[]
   id?: string
+  sizeOrder: string[]
+  municipalityOrder: string[]
 }
 
-export default function StatsSection({ billboards, id }: StatsSectionProps) {
-  const { t } = useTranslation()
+export default function StatsSection({ billboards, id, sizeOrder, municipalityOrder }: StatsSectionProps) {
   const [showStats, setShowStats] = useState(false)
   const [expandedMunicipality, setExpandedMunicipality] = useState<string | null>(null)
 
-  const now = new Date()
-  const tenDaysDate = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000)
-  const thirtyDaysDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-
-  // حساب دقيق للتوفر
-  const classifyBoard = (b: Billboard): 'available' | 'soon' | 'booked' => {
-    const expiry = parseExpiryDate(b.expiryDate)
-    if (b.status === 'متاح' || (expiry && expiry <= tenDaysDate)) return 'available'
-    if (!expiry) return 'booked'
-    if (expiry > tenDaysDate && expiry <= thirtyDaysDate) return 'soon'
-    return 'booked'
+  const classifyBoard = (b: Billboard) => availabilityStatus(b)
+  const position = (order: string[], value: string) => {
+    const index = order.indexOf(value)
+    return index < 0 ? order.length : index
   }
 
   // إحصائيات حسب المقاس
@@ -49,7 +42,7 @@ export default function StatsSection({ billboards, id }: StatsSectionProps) {
     
     return Object.entries(sizeStats)
       .filter(([_, stats]) => stats.available > 0 || stats.soon > 0)
-      .sort((a, b) => (b[1].available + b[1].soon) - (a[1].available + a[1].soon))
+      .sort((a, b) => position(sizeOrder, a[0]) - position(sizeOrder, b[0]))
   })()
 
   // إحصائيات حسب البلدية
@@ -69,7 +62,7 @@ export default function StatsSection({ billboards, id }: StatsSectionProps) {
     
     return Object.entries(munStats)
       .filter(([_, stats]) => stats.available > 0 || stats.soon > 0)
-      .sort((a, b) => (b[1].available + b[1].soon) - (a[1].available + a[1].soon))
+      .sort((a, b) => position(municipalityOrder, a[0]) - position(municipalityOrder, b[0]))
   })()
 
   // إحصائيات المقاسات المتاحة حسب البلدية
@@ -108,74 +101,26 @@ export default function StatsSection({ billboards, id }: StatsSectionProps) {
 
   return (
     <div id={id} className="mb-8 scroll-mt-20" style={{ fontFamily: 'Doran, Tajawal, sans-serif' }}>
-      {/* Luxury Metric Summary Strip */}
-      <div 
-        onClick={() => setShowStats(!showStats)}
-        className="premium-glass-card rounded-3xl p-4 sm:p-5 border border-primary/25 shadow-xl hover:border-primary/50 transition-all duration-300 cursor-pointer group"
-      >
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          
-          {/* Right: Section Badge & Title */}
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary/25 to-amber-500/10 border border-primary/40 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-all shadow-md">
-              <TrendingUp className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-black text-foreground text-sm md:text-base tracking-tight">إحصائيات سريعة ومؤشرات التوفر</h3>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-[10px] font-bold text-primary">
-                  <Sparkles className="w-2.5 h-2.5" />
-                  محدّث لحظياً
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground font-semibold mt-0.5">
-                نظرة شاملة على حالة اللوحات والبلديات والمقاسات الأكثر طلباً
-              </p>
-            </div>
-          </div>
-
-          {/* Center / Metrics Quick Badges */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            {/* Available Metric Badge */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-emerald-600 text-white border border-emerald-500 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-white animate-pulse flex-shrink-0" />
-              <span className="text-xs font-bold text-white">متاح الآن:</span>
-              <span className="text-sm font-black text-white font-mono">{totalAvailable}</span>
-            </div>
-
-            {/* Soon Metric Badge */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-amber-600 text-white border border-amber-500 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-white flex-shrink-0" />
-              <span className="text-xs font-bold text-white">قريباً:</span>
-              <span className="text-sm font-black text-white font-mono">{totalSoon}</span>
-            </div>
-
-            {/* Municipalities Count */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-card border border-border/70 shadow-sm">
-              <Building2 className="w-3.5 h-3.5 text-primary" />
-              <span className="text-xs font-bold text-foreground/80">البلديات:</span>
-              <span className="text-xs font-black text-foreground">{uniqueMunicipalitiesCount}</span>
-            </div>
-
-            {/* Sizes Count */}
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-card border border-border/70 shadow-sm">
-              <Ruler className="w-3.5 h-3.5 text-primary" />
-              <span className="text-xs font-bold text-foreground/80">المقاسات:</span>
-              <span className="text-xs font-black text-foreground">{uniqueSizesCount}</span>
-            </div>
-
-            {/* Expand / Collapse Button */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-primary/10 border border-primary/30 text-primary text-xs font-black hover:bg-primary hover:text-primary-foreground transition-all shadow-sm">
-              <span>{showStats ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}</span>
-              {showStats ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </div>
-          </div>
+      <section className="stats-overview" aria-label="إحصائيات التوفر">
+        <div className="stats-overview-heading">
+          <h3>إحصائيات التوفر</h3>
+          <button type="button" className="stats-details-toggle" aria-expanded={showStats} aria-controls="stats-details" onClick={() => setShowStats(!showStats)}>
+            {showStats ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
+            <ChevronDown size={16} style={{ transform: showStats ? 'rotate(180deg)' : undefined }} />
+          </button>
         </div>
-      </div>
-
+        <div className="stats-metrics">
+          {[
+            { label: 'متاح الآن', value: totalAvailable },
+            { label: 'سيتاح خلال 20 يومًا', value: totalSoon },
+            { label: 'البلديات', value: uniqueMunicipalitiesCount },
+            { label: 'المقاسات', value: uniqueSizesCount },
+          ].map(metric => <div className="stats-metric" key={metric.label}><strong>{metric.value}</strong><span>{metric.label}</span></div>)}
+        </div>
+      </section>
       {/* Expanded Analytics Bento Grid */}
       {showStats && (
-        <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-5 p-5 md:p-6 bg-white dark:bg-card rounded-3xl border-2 border-primary/25 shadow-xl animate-fade-in">
+        <div id="stats-details" className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-5 p-5 md:p-6 bg-white dark:bg-card rounded-3xl border border-border shadow-none">
           
           {/* 1. إحصائيات حسب المقاس */}
           <div className="space-y-3">
@@ -184,7 +129,7 @@ export default function StatsSection({ billboards, id }: StatsSectionProps) {
                 <div className="w-7 h-7 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center">
                   <Ruler className="w-4 h-4 text-primary" />
                 </div>
-                <span>التوفر حسب المقاسات الأكثر طلباً</span>
+                <span>التوفر حسب المقاس</span>
               </h4>
               <span className="text-[11px] font-black text-slate-600 dark:text-muted-foreground">({statsBySize.length} مقاس)</span>
             </div>
@@ -198,12 +143,12 @@ export default function StatsSection({ billboards, id }: StatsSectionProps) {
                   </div>
                   <div className="flex items-center gap-1.5">
                     {stats.available > 0 && (
-                      <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-emerald-600 text-white font-black shadow-sm">
+                      <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-primary/15 text-foreground font-black shadow-sm">
                         {stats.available} متاح
                       </span>
                     )}
                     {stats.soon > 0 && (
-                      <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-amber-600 text-white font-black shadow-sm">
+                      <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-muted text-foreground font-black shadow-sm">
                         {stats.soon} قريباً
                       </span>
                     )}
@@ -241,12 +186,12 @@ export default function StatsSection({ billboards, id }: StatsSectionProps) {
 
                     <div className="flex items-center gap-1.5">
                       {stats.available > 0 && (
-                        <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-emerald-600 text-white font-black shadow-sm">
+                        <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-primary/15 text-foreground font-black shadow-sm">
                           {stats.available} متاح
                         </span>
                       )}
                       {stats.soon > 0 && (
-                        <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-amber-600 text-white font-black shadow-sm">
+                        <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-muted text-foreground font-black shadow-sm">
                           {stats.soon} قريباً
                         </span>
                       )}
@@ -267,7 +212,7 @@ export default function StatsSection({ billboards, id }: StatsSectionProps) {
                       <div className="flex flex-wrap gap-1.5">
                         {Object.entries(sizesByMunicipality[mun])
                           .filter(([_, sizeStats]) => sizeStats.available > 0 || sizeStats.soon > 0)
-                          .sort((a, b) => (b[1].available + b[1].soon) - (a[1].available + a[1].soon))
+                          .sort((a, b) => position(sizeOrder, a[0]) - position(sizeOrder, b[0]))
                           .map(([size, sizeStats]) => (
                             <div 
                               key={size} 
@@ -275,12 +220,12 @@ export default function StatsSection({ billboards, id }: StatsSectionProps) {
                             >
                               <span className="font-extrabold text-slate-900 dark:text-foreground">{size}</span>
                               {sizeStats.available > 0 && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-600 text-white font-black">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/15 text-foreground font-black">
                                   {sizeStats.available} متاح
                                 </span>
                               )}
                               {sizeStats.soon > 0 && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-600 text-white font-black">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-foreground font-black">
                                   {sizeStats.soon} قريباً
                                 </span>
                               )}

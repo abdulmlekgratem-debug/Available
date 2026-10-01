@@ -154,9 +154,11 @@ export async function getWorkbook(): Promise<XLSX.WorkBook> {
 /**
  * الحصول على صفحة معينة من workbook
  */
-export async function getSheet(index: number): Promise<any[]> {
+export async function getSheet(index: number | string): Promise<any[]> {
   const wb = await getWorkbook()
-  const sheetName = wb.SheetNames[index]
+  const sheetName = typeof index === 'string'
+    ? wb.SheetNames.find(name => name.trim() === index.trim())
+    : wb.SheetNames[index]
   if (!sheetName) return []
   const ws = wb.Sheets[sheetName]
   return XLSX.utils.sheet_to_json(ws, { defval: '' })

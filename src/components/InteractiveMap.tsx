@@ -1,3 +1,5 @@
+import { toast } from '@/hooks/use-toast'
+import { availabilityStatus } from '@/utils/availability'
 import { useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense } from "react"
 import { createPortal } from "react-dom"
 import { Card, CardContent } from "@/components/ui/card"
@@ -32,7 +34,8 @@ function MapStatusFilter({ billboards, filter, onFilterChange }: {
     
     billboards.forEach(b => {
       // Use getStatusFromExpiry for consistent counting with card filters
-      const computedStatus = getStatusFromExpiry(b.expiryDate)
+      const category = availabilityStatus(b)
+      const computedStatus = category === 'available' ? 'متاح' : category === 'soon' ? 'قريباً' : 'محجوز'
       if (computedStatus === 'متاح') { available++ }
       else if (computedStatus === 'قريباً') { soon++ }
       else { booked++ }
@@ -64,9 +67,10 @@ function MapStatusFilter({ billboards, filter, onFilterChange }: {
   }, [billboards])
 
   const statusButtons = [
+    { id: 'featured', label: 'متاح الآن وخلال 20 يومًا', count: counts.available + counts.soon, color: 'bg-emerald-500' },
     { id: 'all', label: 'الكل', count: counts.total, color: 'bg-foreground/20' },
     { id: 'available', label: 'متاح', count: counts.available, color: 'bg-emerald-500' },
-    { id: 'soon', label: 'قريباً', count: counts.soon, color: 'bg-amber-500' },
+    { id: 'soon', label: 'خلال 20 يومًا', count: counts.soon, color: 'bg-amber-500' },
     { id: 'booked', label: 'محجوز', count: counts.booked, color: 'bg-red-500' },
   ]
 
@@ -267,7 +271,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
   const [mapProvider, setMapProvider] = useState<MapProvider>('openstreetmap')
   const [mapLoaded, setMapLoaded] = useState(false)
   const [showMap, setShowMap] = useState(false)
-  const [mapStyle, setMapStyle] = useState<string>('google-hybrid')
+  const [mapStyle, setMapStyle] = useState<string>('standard')
   const [activeLayer, setActiveLayer] = useState<string>('google-hybrid')
   const [isDrawingMode, setIsDrawingMode] = useState(false)
   const [drawingPoints, setDrawingPoints] = useState<MapPosition[]>([])
@@ -289,7 +293,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
   const [visitedBillboards, setVisitedBillboards] = useState<Set<string>>(new Set())
   
   const [showSoussetOnly, setShowSoussetOnly] = useState(false)
-  const [mapStatusFilter, setMapStatusFilter] = useState<string>('available')
+  const [mapStatusFilter, setMapStatusFilter] = useState<string>('featured')
   const [swipeStartY, setSwipeStartY] = useState<number | null>(null)
   const [swipeCurrentY, setSwipeCurrentY] = useState<number | null>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -314,10 +318,11 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
   
   // Apply status filter using getStatusFromExpiry for consistency
   const loadedBillboards = useMemo(() => {
+    if (mapStatusFilter === 'featured') return soussetFiltered.filter(b => availabilityStatus(b) !== 'booked')
     if (mapStatusFilter === 'all') return soussetFiltered
-    if (mapStatusFilter === 'available') return soussetFiltered.filter(b => getStatusFromExpiry(b.expiryDate) === 'متاح')
-    if (mapStatusFilter === 'soon') return soussetFiltered.filter(b => getStatusFromExpiry(b.expiryDate) === 'قريباً')
-    if (mapStatusFilter === 'booked') return soussetFiltered.filter(b => getStatusFromExpiry(b.expiryDate) === 'محجوز')
+    if (mapStatusFilter === 'available') return soussetFiltered.filter(b => availabilityStatus(b) === 'available')
+    if (mapStatusFilter === 'soon') return soussetFiltered.filter(b => availabilityStatus(b) === 'soon')
+    if (mapStatusFilter === 'booked') return soussetFiltered.filter(b => availabilityStatus(b) === 'booked')
     // Month filter: month-YYYY-M
     if (mapStatusFilter.startsWith('month-')) {
       const [, ym] = mapStatusFilter.split('month-')
@@ -443,7 +448,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
     if (mapProvider === 'google' && googleMapRef.current) {
       googleMapRef.current.zoomIn()
     } else if (leafletMapRef.current) {
-      (leafletMapRef.current as any).zoomIn?.()
+      (leafletMapRef.current?.querySelector('.leaflet-container') as any)?.zoomIn?.()
     }
   }
 
@@ -451,7 +456,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
     if (mapProvider === 'google' && googleMapRef.current) {
       googleMapRef.current.zoomOut()
     } else if (leafletMapRef.current) {
-      (leafletMapRef.current as any).zoomOut?.()
+      (leafletMapRef.current?.querySelector('.leaflet-container') as any)?.zoomOut?.()
     }
   }
 
@@ -575,7 +580,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
           })
         },
         (error) => {
-          console.error('Geolocation error:', error)
+          toast({ title: 'تعذّر تحديد موقعك', description: error.code === 1 ? 'اسمح بالوصول إلى الموقع، أو ابحث باسم المدينة في الخريطة.' : 'حاول مرة أخرى، أو ابحث باسم المدينة في الخريطة.', variant: 'destructive' })
         },
         { enableHighAccuracy: true, timeout: 10000 }
       )
@@ -600,7 +605,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
         map.setZoom(zoom)
       }
     } else if (leafletMapRef.current) {
-      const leafletMap = (leafletMapRef.current as any)?._leafletMap
+      const leafletMap = (leafletMapRef.current?.querySelector('.leaflet-container') as any)?._leafletMap
       if (leafletMap) {
         leafletMap.setView([lat, lng], zoom, { animate: true })
       }
@@ -615,7 +620,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
         map.panTo({ lat, lng })
       }
     } else if (leafletMapRef.current) {
-      const leafletMap = (leafletMapRef.current as any)?._leafletMap
+      const leafletMap = (leafletMapRef.current?.querySelector('.leaflet-container') as any)?._leafletMap
       if (leafletMap) {
         leafletMap.panTo([lat, lng], { animate: true, duration: 0.6 })
       }
@@ -699,24 +704,14 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
                   </h3>
                   {!isFullscreen && (
                     <p className="text-xs md:text-sm text-muted-foreground font-medium">
-                      استكشف {billboards.length} موقع إعلاني
+                      {isLoadingMarkers ? 'جاري إظهار مواقع اللوحات…' : 'المعروض: ' + loadedBillboards.length + ' لوحة'}
                     </p>
                   )}
                 </div>
               </div>
               
+              {billboards.some(b => { const c = b.coordinates.split(',').map(Number); return c.length !== 2 || !c.every(Number.isFinite) || Math.abs(c[0]) > 90 || Math.abs(c[1]) > 180 }) && !isFullscreen && <p className="text-xs text-muted-foreground">اللوحات التي لا يتوفر موقعها على الخريطة تظهر في القائمة فقط.</p>}
               {/* Instructions Badge - مخفي في وضع ملء الشاشة */}
-              {!isFullscreen && (
-                <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-xl border border-primary/20">
-                  <span className="text-xs text-foreground/80 font-medium">
-                    نقرة = تفاصيل
-                  </span>
-                  <span className="w-1 h-1 rounded-full bg-primary/50" />
-                  <span className="text-xs text-foreground/80 font-medium">
-                    نقرة مزدوجة = تحديد
-                  </span>
-                </div>
-              )}
             </div>
           </div>
           
@@ -882,11 +877,12 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
             {/* Controls - Right Side - مدمجة على الجوال */}
             <div className="absolute top-16 sm:top-2 md:top-4 right-3 md:right-4 grid grid-cols-2 sm:flex sm:flex-col gap-2 z-[1000]">
               {/* Fullscreen Toggle */}
-              <Button size="icon" variant="secondary" className="w-11 h-11 sm:w-11 sm:h-11 md:w-10 md:h-10 rounded-xl bg-card/95 backdrop-blur-md border border-border/50 shadow-lg hover:bg-card touch-manipulation" onClick={toggleFullscreen} title={isFullscreen ? 'تصغير' : 'ملء الشاشة'} aria-label={isFullscreen ? 'تصغير الخريطة' : 'فتح الخريطة بملء الشاشة'}>
+              <Button size="icon" variant="secondary" className="w-11 h-11 sm:w-11 sm:h-11 md:w-10 md:h-10 rounded-xl bg-card/95 backdrop-blur-md border border-border/50 shadow-lg hover:bg-card touch-manipulation" onClick={toggleFullscreen} title={isFullscreen ? 'تصغير' : 'ملء الشاشة'} aria-label={isFullscreen ? 'إغلاق وضع ملء الشاشة' : 'فتح الخريطة بملء الشاشة'}>
                 {isFullscreen ? <Minimize className="w-4 h-4 md:w-5 md:h-5" /> : <Maximize className="w-4 h-4 md:w-5 md:h-5" />}
               </Button>
               
               {/* Zoom buttons - تبقى متاحة باللمس إلى جانب التكبير بإصبعين */}
+              <Button size="icon" variant="secondary" className="w-11 h-11 bg-card/95" aria-label="عرض جميع اللوحات على الخريطة" title="عرض جميع اللوحات" disabled={mapProvider !== 'openstreetmap'} onClick={() => { const map = leafletMapRef.current?.querySelector('.leaflet-container') as any; map?.fitBillboards?.() }}><MapPin size={18} /></Button>
               <Button size="icon" variant="secondary" className="w-11 h-11 sm:w-11 sm:h-11 md:w-10 md:h-10 rounded-xl bg-card/95 backdrop-blur-md border border-border/50 shadow-lg hover:bg-card touch-manipulation" onClick={handleZoomIn} aria-label="تكبير الخريطة" title="تكبير الخريطة">
                 <ZoomIn className="w-4 h-4 md:w-5 md:h-5" />
               </Button>
@@ -1005,7 +1001,7 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
             {!isLiveTrackingMode && <MapLegend billboards={billboards} />}
             
             {/* Status Filter */}
-            {!isLiveTrackingMode && <MapStatusFilter billboards={billboards} filter={mapStatusFilter} onFilterChange={setMapStatusFilter} />}
+            {!isLiveTrackingMode && <MapStatusFilter billboards={showSoussetOnly ? billboards.filter(b => b.size === SOUSSET_SIZE) : billboards} filter={mapStatusFilter} onFilterChange={setMapStatusFilter} />}
             
             {/* Navigation Mode Panel */}
             <NavigationMode

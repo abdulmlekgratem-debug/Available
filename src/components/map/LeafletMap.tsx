@@ -1,3 +1,4 @@
+import { availabilityStatus } from '@/utils/availability'
 import { useEffect, useRef, useState, useCallback, memo } from 'react'
 import L from '@/utils/leafletSetup'
 import 'leaflet/dist/leaflet.css'
@@ -72,6 +73,8 @@ function LeafletMapComponent({
   const recordedRouteLayerRef = useRef<L.Polyline | null>(null)
   const recordedRouteGlowRef = useRef<L.Polyline | null>(null)
   const [isReady, setIsReady] = useState(false)
+  const [tileError, setTileError] = useState(false)
+  const tileErrors = useRef(0)
 
   // Initialize map
   useEffect(() => {
@@ -84,7 +87,8 @@ function LeafletMapComponent({
       center: [LIBYA_CENTER.lat, LIBYA_CENTER.lng],
       zoom: isMobile ? 7 : 8,
       zoomControl: false,
-      attributionControl: false,
+      attributionControl: true,
+      scrollWheelZoom: false,
       maxZoom: 20,
       minZoom: 5
     })
@@ -96,7 +100,7 @@ function LeafletMapComponent({
     }
 
     // Add initial tile layer - Google Hybrid as default
-    const tileConfig = OSM_TILE_LAYERS['google-hybrid'] || OSM_TILE_LAYERS.satellite
+    const tileConfig = OSM_TILE_LAYERS.standard
     tileLayerRef.current = L.tileLayer(tileConfig.url, {
       attribution: tileConfig.attribution,
       maxZoom: tileConfig.maxZoom || 20
@@ -295,12 +299,17 @@ function LeafletMapComponent({
     }
 
     // Get tile config by layer ID
-    const tileConfig = OSM_TILE_LAYERS[mapStyle] || OSM_TILE_LAYERS['google-hybrid']
+    const tileConfig = OSM_TILE_LAYERS[mapStyle] || OSM_TILE_LAYERS.standard
 
     tileLayerRef.current = L.tileLayer(tileConfig.url, {
       attribution: tileConfig.attribution,
       maxZoom: tileConfig.maxZoom || 20
     }).addTo(mapRef.current)
+
+    tileErrors.current = 0
+    setTileError(false)
+    tileLayerRef.current.on('tileerror', () => { tileErrors.current += 1; if (tileErrors.current >= 3) setTileError(true) })
+    tileLayerRef.current.on('tileload', () => { tileErrors.current = 0; setTileError(false) })
 
     // Add labels layer for hybrid modes if available
     if (tileConfig.labels) {
@@ -338,7 +347,7 @@ function LeafletMapComponent({
       // Add billboard markers
       billboards.forEach((billboard) => {
         const coords = billboard.coordinates.split(",").map((coord) => Number.parseFloat(coord.trim()))
-        if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) return
+        if (coords.length !== 2 || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1]) || Math.abs(coords[0]) > 90 || Math.abs(coords[1]) > 180) return
 
         const [lat, lng] = coords
         const isSelected = selectedBillboards?.has(billboard.id) || false
@@ -346,7 +355,7 @@ function LeafletMapComponent({
         
         // Use unified pin design from useMapMarkers
         const days = getDaysRemaining(billboard.expiryDate || null)
-        const markerIcon = createMarkerIcon(billboard.size, billboard.status, isSelected, days)
+        const markerIcon = createMarkerIcon(billboard.size, availabilityStatus(billboard) === 'available' ? 'متاح' : availabilityStatus(billboard) === 'soon' ? 'قريباً' : 'محجوز', isSelected, days)
 
         const icon = L.icon({
           iconUrl: markerIcon.url,
@@ -486,7 +495,7 @@ function LeafletMapComponent({
       if (!billboard) return
       
       const coords = billboard.coordinates.split(",").map((coord) => Number.parseFloat(coord.trim()))
-      if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) return
+      if (coords.length !== 2 || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1]) || Math.abs(coords[0]) > 90 || Math.abs(coords[1]) > 180) return
       
       const [lat, lng] = coords
       
@@ -959,6 +968,15 @@ function LeafletMapComponent({
     }
   }, [recordedRoute, isReady])
 
+  const fitBillboards = useCallback(() => {
+    if (!mapRef.current) return
+    const points = billboards.map(b => b.coordinates.split(',').map(Number)).filter(c => c.length === 2 && c.every(Number.isFinite) && Math.abs(c[0]) <= 90 && Math.abs(c[1]) <= 180)
+    if (points.length) mapRef.current.fitBounds(L.latLngBounds(points.map(c => L.latLng(c[0], c[1]))), { padding: [60, 90], maxZoom: 14 })
+  }, [billboards])
+  const boundsSignature = billboards.map(b => b.id).join(',')
+  useEffect(() => { if (!isReady || !billboards.length || targetLocation) return; const timer = setTimeout(fitBillboards, 300); return () => clearTimeout(timer) }, [isReady, boundsSignature])
+  useEffect(() => { if (mapContainerRef.current) (mapContainerRef.current as any).fitBillboards = fitBillboards }, [fitBillboards])
+
   // Expose zoom controls
   const zoomIn = useCallback(() => {
     mapRef.current?.zoomIn()
@@ -977,11 +995,11 @@ function LeafletMapComponent({
   }, [zoomIn, zoomOut])
 
   return (
-    <div 
+    <><div
       ref={mapContainerRef} 
       className="w-full h-full"
       style={{ background: '#1a1a2e' }}
-    />
+    />{tileError && <div role="status" className="absolute top-32 left-3 right-3 z-[1001] rounded-xl bg-card p-3 shadow-lg"><p>تعذّر تحميل صور الخريطة. يمكنك مشاهدة اللوحات في القائمة أو تغيير طبقة الخريطة.</p><button className="min-h-11 underline" onClick={() => { tileErrors.current = 0; setTileError(false); tileLayerRef.current?.redraw() }}>إعادة المحاولة</button></div>}</>
   )
 }
 

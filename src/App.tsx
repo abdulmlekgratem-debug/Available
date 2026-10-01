@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from "react"
-import QRCode from 'qrcode'
+import { matchesAvailability } from '@/utils/availability'
+import { useState, useMemo, useEffect, lazy, Suspense } from "react"
+
 import { openPrintPreview } from '@/services/printWindow'
 import { useTranslation } from "react-i18next"
-import { formatExpiryDate, parseExpiryDate } from "@/utils/dateUtils"
+import { formatExpiryDate } from "@/utils/dateUtils"
 import { escapeHtml } from "@/utils/escapeHtml"
 import { WHATSAPP_NUMBER, WHATSAPP_BASE_URL } from "@/constants/contact"
 import { createPortal } from "react-dom"
@@ -12,13 +13,13 @@ import { toast } from "@/hooks/use-toast"
 
 import SearchFilters from "@/components/SearchFilters"
 import BillboardCard from "@/components/BillboardCard"
-import InteractiveMap from "@/components/InteractiveMap"
+import MapSkeleton from "@/components/MapSkeleton"
+const InteractiveMap = lazy(() => import("@/components/InteractiveMap"))
 import PrintDialog, { PricingOptions } from "@/components/PrintDialog"
 import { getPrice, formatPrice, calculateDiscountedPrice, RENTAL_PERIODS } from "@/services/pricingService"
 import MapSidePanel from "@/components/MapSidePanel"
 import ImageViewerModal from "@/components/ImageViewerModal"
 import Footer from "@/components/Footer"
-import SeoLocationsIndex from "@/components/SeoLocationsIndex"
 import StatsSection from "@/components/StatsSection"
 import ClientLogos from "@/components/ClientLogos"
 import UpdateNotice from "@/components/UpdateNotice"
@@ -26,12 +27,10 @@ import DisplayModeToggle from "@/components/DisplayModeToggle"
 import HeroSlider from "@/components/HeroSlider"
 import SiteHeader from "@/components/SiteHeader"
 import LanguageHintToast from "@/components/LanguageHintToast"
-import HowItWorks from "@/components/HowItWorks"
-import FinalCTA from "@/components/FinalCTA"
 import BillboardCardSkeleton from "@/components/BillboardCardSkeleton"
 import { Billboard } from "@/types"
 import { useTheme } from "@/hooks/useTheme"
-import { useMapPreloader } from "@/hooks/useMapPreloader"
+
 import { useDisplayMode } from "@/hooks/useDisplayMode"
 import { useBillboardData } from "@/hooks/useBillboardData"
 import { useBillboardFilters } from "@/hooks/useBillboardFilters"
@@ -41,7 +40,7 @@ export default function App() {
   const ar = i18n.language.startsWith("ar")
   const { theme, toggleTheme } = useTheme()
   const displayMode = useDisplayMode()
-  useMapPreloader()
+
 
   // Data loading
   const { billboards, loading, loadError, reload } = useBillboardData()
@@ -131,48 +130,12 @@ export default function App() {
 
   const clearSelection = () => setSelectedBillboards(new Set())
 
-  // حساب نسبة التحديد لكل فترة من فترات التوفر وفق الفلاتر النشطة
   const selectionByPeriod = useMemo(() => {
-    const now = new Date()
-    const tenDaysDate = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000)
-    const thirtyDaysDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
     const result: Record<string, { selected: number; total: number }> = {}
-
-    const classify = (b: Billboard): string => {
-      const expiry = parseExpiryDate(b.expiryDate)
-      if (filters.excludeSoonFromAvailable) {
-        if (b.status === 'متاح' && (!expiry || expiry <= now)) return 'available'
-      } else {
-        if (b.status === 'متاح' || (expiry && expiry <= tenDaysDate)) return 'available'
-      }
-      if (!expiry) return 'unknown'
-      if (expiry > tenDaysDate && expiry <= thirtyDaysDate) return 'soon'
-      if (expiry > thirtyDaysDate) {
-        const m = expiry.getMonth() + 1
-        const y = expiry.getFullYear()
-        return `month-${m}-${y}`
-      }
-      return 'expired'
+    for (const period of ['all', ...filters.availabilityOptions.map(o => o.value)]) {
+      const pool = filters.filteredBillboardsForMap.filter(b => matchesAvailability(b, period, filters.excludeSoonFromAvailable))
+      result[period] = { total: pool.length, selected: pool.filter(b => selectedBillboards.has(b.id)).length }
     }
-
-    // initialise known periods
-    const periods = ['all', 'available', 'soon', ...filters.availabilityOptions.map(o => o.value)]
-    periods.forEach(p => { result[p] = { selected: 0, total: 0 } })
-
-    // نستخدم filteredBillboardsForMap حتى تعكس الأعداد ونسب التحديد الفلاتر النشطة (المدينة، البلدية، البحث، الحجم)
-    const pool = filters.filteredBillboardsForMap
-    pool.forEach(b => {
-      const period = classify(b)
-      const isSelected = selectedBillboards.has(b.id)
-      // all
-      result['all'].total++
-      if (isSelected) result['all'].selected++
-      // specific period
-      if (result[period]) {
-        result[period].total++
-        if (isSelected) result[period].selected++
-      }
-    })
     return result
   }, [filters.filteredBillboardsForMap, selectedBillboards, filters.availabilityOptions, filters.excludeSoonFromAvailable])
 
@@ -180,32 +143,7 @@ export default function App() {
   const togglePeriodSelection = (periodValue: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
 
-    const now = new Date()
-    const tenDaysDate = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000)
-    const thirtyDaysDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-
-    const matchesPeriod = (b: Billboard): boolean => {
-      const expiry = parseExpiryDate(b.expiryDate)
-      if (periodValue === 'all') return true
-      if (periodValue === 'available') {
-        if (filters.excludeSoonFromAvailable) {
-          return b.status === 'متاح' && (!expiry || expiry <= now)
-        }
-        return b.status === 'متاح' || (expiry !== null && expiry <= tenDaysDate)
-      }
-      if (b.status === 'متاح') return false
-      if (!expiry) return false
-      if (periodValue === 'soon') {
-        return expiry > tenDaysDate && expiry <= thirtyDaysDate
-      }
-      if (periodValue.startsWith('month-')) {
-        if (expiry <= thirtyDaysDate) return false
-        const m = expiry.getMonth() + 1
-        const y = expiry.getFullYear()
-        return `month-${m}-${y}` === periodValue
-      }
-      return false
-    }
+    const matchesPeriod = (b: Billboard) => matchesAvailability(b, periodValue, filters.excludeSoonFromAvailable)
 
     // الالتزام التام بالفلاتر النشطة الحالية (البحث، البلديات، المدن، المقاسات، الموقع)
     const targetPool = filters.filteredBillboardsForMap.filter(matchesPeriod)
@@ -280,7 +218,7 @@ export default function App() {
     for (const billboard of billboardsToPrint) {
       if (billboard.coordinates) {
         try {
-          qrCodes[billboard.id] = await QRCode.toDataURL(
+          qrCodes[billboard.id] = await (await import('qrcode')).default.toDataURL(
             `https://www.google.com/maps?q=${billboard.coordinates}`,
             { width: 80, margin: 1, color: { dark: '#000000', light: '#ffffff' } }
           )
@@ -499,7 +437,7 @@ export default function App() {
           toggleTheme={toggleTheme}
           onScrollToBillboards={() => document.getElementById('billboards-section')?.scrollIntoView({ behavior: 'smooth' })}
           onShowMap={() => { setShowMap(true); document.getElementById('billboards-section')?.scrollIntoView({ behavior: 'smooth' }) }}
-          onSelectCity={city => { filters.setSelectedCities([city]); filters.setSelectedMunicipalities([]); filters.setSelectedAreas([]); filters.setSearchTerm(''); filters.setSelectedSizes([]); filters.setNearbyLocation(null); filters.setSelectedAvailability(['all']); document.getElementById('billboards-section')?.scrollIntoView({ behavior: 'smooth' }) }}
+          onSelectCity={city => { filters.setSelectedCities([city]); filters.setSelectedMunicipalities([]); filters.setSelectedAreas([]); filters.setSearchTerm(''); filters.setSelectedSizes([]); filters.setNearbyLocation(null); filters.setSelectedAvailability(['available']); filters.setExcludeSoonFromAvailable(false); document.getElementById('billboards-section')?.scrollIntoView({ behavior: 'smooth' }) }}
         />
       )}
 
@@ -551,7 +489,7 @@ export default function App() {
         )}
 
         {showMap && (
-          <InteractiveMap
+          <Suspense fallback={<MapSkeleton />}><InteractiveMap
             billboards={filteredBillboardsForMap}
             onImageView={setSelectedImage}
             selectedBillboards={selectedBillboards}
@@ -559,17 +497,17 @@ export default function App() {
             onSelectMultiple={selectMultipleBillboards}
             onDownloadSelected={() => { if (selectedBillboards.size > 0) setShowSelectedPrintDialog(true) }}
             onFullscreenChange={setIsMapFullscreen}
-          />
+          /></Suspense>
         )}
 
         <div className="availability-toolbar">
-          <div className="availability-heading"><div><h3>{ar ? 'التوفر والتحديد السريع' : 'Availability & quick selection'}</h3><p>{ar ? 'الأعداد والتحديد حسب المدينة والمنطقة والمقاس والبحث المطبّق.' : 'Counts and selections respect your city, area, size and search filters.'}</p></div><label className="catalog-checkbox"><input type="checkbox" checked={filters.excludeSoonFromAvailable} onChange={e => filters.setExcludeSoonFromAvailable(e.target.checked)} />{ar ? 'المتاح حاليًا فقط' : 'Available now only'}</label></div>
+          <div className="availability-heading"><div><h3>{ar ? 'التوفر والتحديد السريع' : 'Availability & quick selection'}</h3><p>{ar ? 'الأعداد والتحديد حسب المدينة والمنطقة والمقاس والبحث المطبّق.' : 'Counts and selections respect your city, area, size and search filters.'}</p></div><label className="catalog-checkbox"><input type="checkbox" checked={filters.excludeSoonFromAvailable && filters.selectedAvailability.length === 1 && filters.selectedAvailability[0] === 'available'} onChange={e => { filters.setExcludeSoonFromAvailable(e.target.checked); filters.setSelectedAvailability(e.target.checked ? ['available'] : ['all']) }} />{ar ? 'المتاح حاليًا فقط' : 'Available now only'}</label></div>
           <div className="availability-range-grid">
             {[{ value: 'all', label: ar ? 'جميع اللوحات' : 'All billboards' }, ...filters.availabilityOptions].map(option => {
               const active = option.value === 'all' ? !filters.selectedAvailability.length || filters.selectedAvailability.includes('all') : filters.selectedAvailability.includes(option.value)
               const range = selectionByPeriod[option.value] || { total: 0, selected: 0 }
               const allSelected = range.total > 0 && range.selected === range.total
-              const label = option.label.replace(/\s*\(\d+\)$/, '')
+              const label = option.value === 'available' && !filters.excludeSoonFromAvailable ? (ar ? 'متاح أو خلال 20 يومًا' : 'Available or within 20 days') : option.label.replace(/\s*\(\d+\)$/, '')
               return <div key={option.value} className={'availability-range' + (active ? ' is-active' : '')}>
                 <button className="availability-range-filter" aria-pressed={active} onClick={() => filters.toggleAvailability(option.value)}><span>{label}</span><strong>{range.total}</strong></button>
                 <button className="availability-range-select" disabled={!range.total} aria-pressed={allSelected} onClick={() => togglePeriodSelection(option.value)}><CheckSquare size={16} /><span>{allSelected ? (ar ? 'إلغاء التحديد' : 'Deselect') : (ar ? 'تحديد النطاق' : 'Select range')}</span><bdi>{range.selected}/{range.total}</bdi></button>
@@ -755,6 +693,12 @@ export default function App() {
             </div>
             <p className="text-foreground text-xl mb-4 font-bold">{t('list.no_results_title')}</p>
             <p className="text-muted-foreground font-semibold">{t('list.no_results_subtitle')}</p>
+            <Button className="mt-6 min-h-11" onClick={() => {
+              filters.setSearchTerm(''); filters.setSelectedCities([]); filters.setSelectedMunicipalities([])
+              filters.setSelectedAreas([]); filters.setSelectedSizes([]); filters.setNearbyLocation(null)
+              filters.setSelectedAvailability(['available']); filters.setExcludeSoonFromAvailable(false)
+            }}>{ar ? 'إعادة البحث وعرض المتاح' : 'Reset search and show availability'}</Button>
+            <a href="/billboard-guide.html" className="block mt-4 underline">{ar ? 'مساعدة في اختيار اللوحات' : 'Help choosing billboards'}</a>
           </div>
         )}
       </main>
@@ -791,11 +735,8 @@ export default function App() {
         onClose={() => setSelectedImage(null)}
       />
 
-      {!isMapFullscreen && !loading && <div className="page-width insights-section"><StatsSection billboards={billboards} id="stats-section" /></div>}
+      {!isMapFullscreen && !loading && <div className="page-width insights-section"><StatsSection billboards={billboards} sizeOrder={filters.sizes} municipalityOrder={filters.municipalities} id="stats-section" /></div>}
       {!isMapFullscreen && <ClientLogos />}
-      {!isMapFullscreen && <HowItWorks />}
-      {!isMapFullscreen && <FinalCTA />}
-      {!isMapFullscreen && <SeoLocationsIndex />}
       {!isMapFullscreen && <Footer id="footer" theme={theme} />}
 
       {/* Global MapSidePanel outside main stack context */}

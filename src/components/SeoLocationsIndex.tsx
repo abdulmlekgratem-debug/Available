@@ -4,15 +4,12 @@
  * يحسّن ظهور الموقع في نتائج البحث للاستعلامات الجغرافية الدقيقة
  */
 import seo from "@/data/seoKeywords.json"
-import { buildArabicCombos, buildEnglishCombos } from "@/utils/seoCombos"
 
 type Tree = Record<string, Record<string, Record<string, string[]>>>
 
 export default function SeoLocationsIndex() {
   const tree = seo.tree as Tree
   const cities = Object.keys(tree).sort()
-  const arCombos = buildArabicCombos()
-  const enCombos = buildEnglishCombos()
 
   return (
     <section
@@ -24,10 +21,10 @@ export default function SeoLocationsIndex() {
           المناطق التي نخدمها في ليبيا
         </h2>
         <p className="text-sm text-muted-foreground text-center mb-3">
-          لوحات إعلانية بجوار {seo.landmarks.length}+ نقطة دالة في {seo.areas.length} منطقة و{seo.municipalities.length} بلدية بـ{seo.cities.length} مدن ليبية
+          استكشف المدن والمناطق في فهرس المواقع. راجع القائمة والخريطة لمعرفة التوفر الحالي.
         </p>
         <p className="text-xs text-muted-foreground/90 text-center mb-6 leading-relaxed max-w-3xl mx-auto">
-          <span className="font-semibold text-foreground/80">لافتات طرقية، لوحات طرقية، دعاية طرقية، لافتات محلات، حملات إعلانية، تأجير لوحات وشركة دعاية وإعلان في: </span>
+          <span className="font-semibold text-foreground/80">المدن المسجلة في فهرس المواقع: </span>
           {seo.cities.map((c, i) => (
             <span key={c}>
               {c}{i < seo.cities.length - 1 ? "، " : "."}
@@ -89,32 +86,7 @@ export default function SeoLocationsIndex() {
           })}
         </div>
 
-        {/* قائمة شاملة مخفية بصرياً لكنها قابلة للزحف */}
-        <div className="sr-only" aria-hidden="false">
-          <h3>كلمات مفتاحية شاملة</h3>
-          <p>
-            {seo.cities.map((c) => `لوحات إعلانية في ${c}`).join("، ")}
-          </p>
-          <p>
-            {seo.municipalities.map((m) => `لوحات إعلانية ببلدية ${m}`).join("، ")}
-          </p>
-          <p>
-            {seo.areas.map((a) => `لوحات إعلانية بمنطقة ${a}`).join("، ")}
-          </p>
-          <p>
-            {seo.landmarks.map((l) => `لوحة إعلانية ${l}`).join("، ")}
-          </p>
-          <p>
-            مقاسات اللوحات المتاحة: {seo.sizes.join("، ")}. أنواع اللوحات:{" "}
-            {seo.types.join("، ")}.
-          </p>
 
-          <h3>تركيبات بحث عربية</h3>
-          <p>{arCombos.join("، ")}</p>
-
-          <h3>English search phrases</h3>
-          <p>{enCombos.join(", ")}</p>
-        </div>
 
       </div>
     </section>

@@ -101,9 +101,6 @@ export default function HeroSlider({ totalBillboards, billboards = [], theme, to
           </div>
         </div>
       </div>
-      <ol className="page-width journey-strip" aria-label={ar ? 'خطوات اختيار حملتك' : 'Plan your campaign'}>
-        {[ar ? 'ابحث عن موقعك' : 'Find a location', ar ? 'حدّد لوحات حملتك' : 'Shortlist your billboards', ar ? 'تواصل لتأكيد الحجز' : 'Contact us to confirm'].map((step, i) => <li key={step}><span>{String(i + 1).padStart(2, '0')}</span>{step}</li>)}
-      </ol>
     </section>
   )
 }
