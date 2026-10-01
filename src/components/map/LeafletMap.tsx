@@ -383,11 +383,11 @@ function LeafletMapComponent({
         })
 
         // Create popup content (click only - no hover tooltip)
-        const popupContent = createInfoWindowContent(billboard)
+        const popupContent = createInfoWindowContent(billboard, selectedBillboards?.has(billboard.id) || false)
         marker.bindPopup(popupContent, { 
           className: 'leaflet-popup-dark',
-          maxWidth: 280,
-          minWidth: 260,
+          maxWidth: 340,
+          minWidth: 0,
           offset: [0, -10],
           autoPan: true,
           autoPanPadding: L.point(40, 40)
@@ -513,8 +513,8 @@ function LeafletMapComponent({
       mapRef.current.closePopup()
       
       // Create and open popup
-      const popupContent = createInfoWindowContent(billboard)
-      L.popup({ className: 'leaflet-popup-dark', maxWidth: 280, minWidth: 260, offset: [0, -35], autoPan: true, autoPanPadding: L.point(40, 40) })
+      const popupContent = createInfoWindowContent(billboard, selectedBillboards?.has(billboard.id) || false)
+      L.popup({ className: 'leaflet-popup-dark', maxWidth: 340, minWidth: 0, offset: [0, -35], autoPan: true, autoPanPadding: L.point(40, 40) })
         .setLatLng([lat, lng])
         .setContent(popupContent)
         .openOn(mapRef.current)

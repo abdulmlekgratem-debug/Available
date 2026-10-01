@@ -289,7 +289,7 @@ const GoogleMapComponent = forwardRef<GoogleMapRef, GoogleMapProps>(({
             </div>
           </div>
         `,
-        maxWidth: 280,
+        maxWidth: 340,
       })
 
       companyMarker.addListener("click", () => {
@@ -387,7 +387,7 @@ const GoogleMapComponent = forwardRef<GoogleMapRef, GoogleMapProps>(({
       })
 
       const infoWindow = new window.google.maps.InfoWindow({
-        content: createInfoWindowContent(billboard),
+        content: createInfoWindowContent(billboard, selectedBillboards?.has(billboard.id) || false),
       })
 
       // Single click: Open info window
@@ -603,7 +603,7 @@ const GoogleMapComponent = forwardRef<GoogleMapRef, GoogleMapProps>(({
       
       // Create and open info window at billboard position
       const infoWindow = new window.google.maps.InfoWindow({
-        content: createInfoWindowContent(billboard),
+        content: createInfoWindowContent(billboard, selectedBillboards?.has(billboard.id) || false),
         position: { lat, lng }
       })
       

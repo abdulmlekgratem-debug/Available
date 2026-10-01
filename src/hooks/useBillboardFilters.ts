@@ -159,11 +159,15 @@ export function useBillboardFilters(billboards: Billboard[]): UseBillboardFilter
 
     const availableCount = filteredBillboardsForMap.filter(b => matchesAvailability(b, 'available', excludeSoonFromAvailable)).length
     options.push({ value: 'available', label: (excludeSoonFromAvailable ? i18n.t('status.available') : i18n.language.startsWith('ar') ? 'متاح الآن وخلال 20 يومًا' : 'Available now & within 20 days') + ' (' + availableCount + ')', count: availableCount })
+    const nowCount = filteredBillboardsForMap.filter(b => matchesAvailability(b, 'available-now')).length
+    options.push({ value: 'available-now', label: (i18n.language.startsWith('ar') ? 'المتاح حاليًا فقط' : 'Available now only') + ' (' + nowCount + ')', count: nowCount })
     const soonCount = filteredBillboardsForMap.filter(b => matchesAvailability(b, 'soon')).length
     options.push({ value: 'soon', label: i18n.t('status.soon') + ' (' + soonCount + ')', count: soonCount })
+    const bookedCount = filteredBillboardsForMap.filter(b => matchesAvailability(b, 'booked')).length
+    options.push({ value: 'booked', label: i18n.t('status.rented') + ' (' + bookedCount + ')', count: bookedCount })
 
     const monthNames = (i18n.t('months', { returnObjects: true }) as string[]) || ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
-    for (let i = 1; i <= 12; i++) {
+    for (let i = 0; i <= 12; i++) {
       const targetMonth = (currentMonth + i) % 12
       const targetYear = currentYear + Math.floor((currentMonth + i) / 12)
       const monthCount = filteredBillboardsForMap.filter(b => matchesAvailability(b, 'month-' + (targetMonth + 1) + '-' + targetYear)).length

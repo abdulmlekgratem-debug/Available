@@ -1,5 +1,6 @@
 import { toast } from '@/hooks/use-toast'
 import { availabilityStatus } from '@/utils/availability'
+import { matchesAvailability } from '@/utils/availability'
 import { useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense } from "react"
 import { createPortal } from "react-dom"
 import { Card, CardContent } from "@/components/ui/card"
@@ -40,7 +41,7 @@ function MapStatusFilter({ billboards, filter, onFilterChange }: {
       else { booked++ }
       
       // Monthly grouping for non-available billboards
-      if (computedStatus !== 'متاح') {
+      if (computedStatus === 'محجوز') {
         const parsed = parseExpiryDate(b.expiryDate)
         if (parsed && parsed >= now) {
           const key = `${parsed.getFullYear()}-${parsed.getMonth()}`
@@ -54,7 +55,7 @@ function MapStatusFilter({ billboards, filter, onFilterChange }: {
         const [y, m] = key.split('-').map(Number)
         const date = new Date(y, m)
         return { 
-          key: `month-${key}`, 
+          key: `month-${m + 1}-${y}`, 
           timestamp: date.getTime(),
           label: date.toLocaleDateString('ar-LY', { month: 'short', year: 'numeric' }), 
           count 
@@ -257,6 +258,9 @@ const GoogleMapComponent = lazy(() =>
 
 interface InteractiveMapProps {
   billboards: Billboard[]
+  availability: string[]
+  strictAvailability: boolean
+  onAvailabilityChange: (period: string, strict: boolean) => void
   onImageView: (imageUrl: string) => void
   selectedBillboards?: Set<string>
   onToggleSelection?: (billboardId: string) => void
@@ -265,7 +269,7 @@ interface InteractiveMapProps {
   onFullscreenChange?: (isFullscreen: boolean) => void
 }
 
-export default function InteractiveMap({ billboards, onImageView, selectedBillboards, onToggleSelection, onSelectMultiple, onDownloadSelected, onFullscreenChange }: InteractiveMapProps) {
+export default function InteractiveMap({ billboards, availability, strictAvailability, onAvailabilityChange, onImageView, selectedBillboards, onToggleSelection, onSelectMultiple, onDownloadSelected, onFullscreenChange }: InteractiveMapProps) {
   const googleMapRef = useRef<any>(null)
   const leafletMapRef = useRef<HTMLDivElement>(null)
   
@@ -294,7 +298,8 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
   const [visitedBillboards, setVisitedBillboards] = useState<Set<string>>(new Set())
   
   const [showSoussetOnly, setShowSoussetOnly] = useState(false)
-  const [mapStatusFilter, setMapStatusFilter] = useState<string>('featured')
+  const mapStatusFilter = availability.length === 1 ? (availability[0] === 'available-now' ? 'available' : availability[0] === 'available' && !strictAvailability ? 'featured' : availability[0]) : availability.length ? 'multiple' : 'all'
+  const setMapStatusFilter = (period: string) => onAvailabilityChange(period === 'featured' ? 'available' : period === 'available' ? 'available-now' : period, false)
   const [swipeStartY, setSwipeStartY] = useState<number | null>(null)
   const [swipeCurrentY, setSwipeCurrentY] = useState<number | null>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -317,24 +322,11 @@ export default function InteractiveMap({ billboards, onImageView, selectedBillbo
     ? rawLoadedBillboards.filter(b => b.size === SOUSSET_SIZE)
     : rawLoadedBillboards
   
-  // Apply status filter using getStatusFromExpiry for consistency
+  // Use exactly the same availability rules and state as the catalogue.
   const loadedBillboards = useMemo(() => {
-    if (mapStatusFilter === 'featured') return soussetFiltered.filter(b => availabilityStatus(b) !== 'booked')
-    if (mapStatusFilter === 'all') return soussetFiltered
-    if (mapStatusFilter === 'available') return soussetFiltered.filter(b => availabilityStatus(b) === 'available')
-    if (mapStatusFilter === 'soon') return soussetFiltered.filter(b => availabilityStatus(b) === 'soon')
-    if (mapStatusFilter === 'booked') return soussetFiltered.filter(b => availabilityStatus(b) === 'booked')
-    // Month filter: month-YYYY-M
-    if (mapStatusFilter.startsWith('month-')) {
-      const [, ym] = mapStatusFilter.split('month-')
-      const [y, m] = ym.split('-').map(Number)
-      return soussetFiltered.filter(b => {
-        const parsed = parseExpiryDate(b.expiryDate)
-        return parsed && parsed.getFullYear() === y && parsed.getMonth() === m
-      })
-    }
-    return soussetFiltered
-  }, [soussetFiltered, mapStatusFilter])
+    if (!availability.length || availability.includes('all')) return soussetFiltered
+    return soussetFiltered.filter(board => availability.some(period => matchesAvailability(board, period, strictAvailability)))
+  }, [soussetFiltered, availability, strictAvailability])
   // Mark tutorial as seen on mount (disabled)
   useEffect(() => {
     localStorage.setItem('map-tutorial-seen', 'true')

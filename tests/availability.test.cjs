@@ -22,6 +22,7 @@ for (const days of [-1, 0, 1, 19, 20, 21, 30]) {
   const b = board(days);
   assert.equal(matchesAvailability(b, 'available'), days <= 20, 'default window at ' + days);
   assert.equal(matchesAvailability(b, 'available', true), days <= 0, 'available now at ' + days);
+  assert.equal(matchesAvailability(b, 'available-now'), days <= 0, 'now-only button at ' + days);
   assert.equal(matchesAvailability(b, 'soon'), days > 0 && days <= 20, 'soon at ' + days);
   assert.equal(availabilityStatus(b), days <= 0 ? 'available' : days <= 20 ? 'soon' : 'booked');
 }

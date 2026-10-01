@@ -55,6 +55,21 @@ export default function App() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [showMap, setShowMap] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  useEffect(() => {
+    const handlePlaceFilter = (event: Event) => {
+      const detail = (event as CustomEvent<{ kind: string; value: string }>).detail
+      if (!detail || typeof detail.value !== 'string' || !detail.value.trim()) return
+      if (detail.kind === 'area') filters.setSelectedAreas([detail.value])
+      else if (detail.kind === 'municipality') filters.setSelectedMunicipalities([detail.value])
+      else if (detail.kind === 'city') filters.setSelectedCities([detail.value])
+      else return
+      setCurrentPage(1)
+      toast({ title: t('list.filter_applied'), description: detail.value })
+    }
+    document.addEventListener('filterBillboardsByPlace', handlePlaceFilter)
+    return () => document.removeEventListener('filterBillboardsByPlace', handlePlaceFilter)
+  }, [filters.setSelectedAreas, filters.setSelectedMunicipalities, filters.setSelectedCities, t])
+
   const [selectedBillboards, setSelectedBillboards] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('gf_shortlist')
@@ -491,6 +506,9 @@ export default function App() {
         {showMap && (
           <Suspense fallback={<MapSkeleton />}><InteractiveMap
             billboards={filteredBillboardsForMap}
+            availability={filters.selectedAvailability}
+            strictAvailability={filters.excludeSoonFromAvailable}
+            onAvailabilityChange={(period, strict) => { filters.setSelectedAvailability([period]); filters.setExcludeSoonFromAvailable(strict) }}
             onImageView={setSelectedImage}
             selectedBillboards={selectedBillboards}
             onToggleSelection={toggleBillboardSelection}
@@ -501,7 +519,7 @@ export default function App() {
         )}
 
         <div className="availability-toolbar">
-          <div className="availability-heading"><div><h3>{ar ? 'التوفر والتحديد السريع' : 'Availability & quick selection'}</h3><p>{ar ? 'الأعداد والتحديد حسب المدينة والمنطقة والمقاس والبحث المطبّق.' : 'Counts and selections respect your city, area, size and search filters.'}</p></div><label className="catalog-checkbox"><input type="checkbox" checked={filters.excludeSoonFromAvailable && filters.selectedAvailability.length === 1 && filters.selectedAvailability[0] === 'available'} onChange={e => { filters.setExcludeSoonFromAvailable(e.target.checked); filters.setSelectedAvailability(e.target.checked ? ['available'] : ['all']) }} />{ar ? 'المتاح حاليًا فقط' : 'Available now only'}</label></div>
+          <div className="availability-heading"><div><h3>{ar ? 'التوفر والتحديد السريع' : 'Availability & quick selection'}</h3><p>{ar ? 'الأعداد والتحديد حسب المدينة والمنطقة والمقاس والبحث المطبّق.' : 'Counts and selections respect your city, area, size and search filters.'}</p></div></div>
           <div className="availability-range-grid">
             {[{ value: 'all', label: ar ? 'جميع اللوحات' : 'All billboards' }, ...filters.availabilityOptions].map(option => {
               const active = option.value === 'all' ? !filters.selectedAvailability.length || filters.selectedAvailability.includes('all') : filters.selectedAvailability.includes(option.value)

@@ -56,7 +56,7 @@ export const createPinSvgUrl = (size: string, status: string, isSelected: boolea
   
   const pinH = isSelected ? 56 : 44
   const w = 48
-  const h = pinH + 10
+  const h = pinH + 18
   const cx = w / 2
   
   // Pin geometry
@@ -94,7 +94,7 @@ export const createPinSvgUrl = (size: string, status: string, isSelected: boolea
              C${cx - 5} ${tipY - 12}, ${cx - headR - 4} ${headCy + 10}, ${cx - headR - 4} ${headCy}
              A${headR + 4} ${headR + 4} 0 1 1 ${cx + headR + 4} ${headCy}
              C${cx + headR + 4} ${headCy + 10}, ${cx + 5} ${tipY - 12}, ${cx} ${tipY}Z"
-          fill="${main}"/>
+          fill="${main}" stroke="#ffffff" stroke-width="2"/>
 
     <!-- Light side gradient -->
     <path d="M${cx} ${tipY}
@@ -120,8 +120,8 @@ export const createPinSvgUrl = (size: string, status: string, isSelected: boolea
 
   ${showDays ? `
   <g>
-    <rect x="${cx - 14}" y="${tipY - 2}" width="28" height="13" rx="6.5" fill="#FF9800" stroke="#fff" stroke-width="1"/>
-    <text x="${cx}" y="${tipY + 8}" text-anchor="middle" font-family="Manrope,sans-serif" font-size="7.5" font-weight="800" fill="#fff">${daysRemaining} يوم</text>
+    <rect x="${cx - 21}" y="${tipY - 2}" width="42" height="17" rx="4" fill="#ffffff" stroke="#333333" stroke-width="1"/>
+    <text x="${cx}" y="${tipY + 10}" text-anchor="middle" font-family="Tajawal,Arial,sans-serif" font-size="10" font-weight="800" fill="#181818">${daysRemaining} يوم</text>
   </g>` : ''}
 
   ${isSelected ? `
@@ -140,12 +140,13 @@ export const createPinSvgUrl = (size: string, status: string, isSelected: boolea
 
 export const createMarkerIcon = (size: string, status: string, isSelected: boolean = false, daysRemaining?: number | null): MarkerIcon => {
   const { url, pinSize } = createPinSvgUrl(size, status, isSelected, daysRemaining)
-  const w = 48
-  const h = pinSize + 10
+  const scale = 1.2
+  const w = 48 * scale
+  const h = (pinSize + 18) * scale
   return {
     url,
     size: { width: w, height: h },
-    anchor: { x: w / 2, y: h - 3 },
+    anchor: { x: w / 2, y: (pinSize + 2) * scale },
     labelOrigin: { x: w / 2, y: h + 8 }
   }
 }

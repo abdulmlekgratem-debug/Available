@@ -9,6 +9,7 @@ export function availabilityStatus(b: Billboard): 'available' | 'soon' | 'booked
 export function matchesAvailability(b: Billboard, period: string, strict = false): boolean {
   const status = availabilityStatus(b)
   if (period === 'all') return true
+  if (period === 'available-now') return status === 'available'
   if (period === 'available') return status === 'available' || (!strict && status === 'soon')
   if (period === 'soon') return status === 'soon'
   if (period === 'booked') return status === 'booked'
