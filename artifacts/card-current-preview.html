@@ -1,90 +1,5 @@
-import { preparePrintImages } from './printImages'
-import type { Billboard } from '@/types'
-import QRCode from 'qrcode'
-import { openPrintPreview } from './printWindow'
-import type { PricingOptions } from '@/components/PrintDialog'
-import { escapeHtml } from '@/utils/escapeHtml'
-import { formatExpiryDate } from '@/utils/dateUtils'
-import { calculateDiscountedPrice, formatPrice, getPrice, RENTAL_PERIODS } from './pricingService'
-
-interface CardPrintOptions {
-  includeLogo: boolean
-  includeImages: boolean
-  pricing: PricingOptions
-  ar: boolean
-  thumbnail?: boolean
-}
-
-const photoDimensions = new Map<string, Promise<{ width: number; height: number } | null>>()
-function measurePhoto(url: string) {
-  if (!photoDimensions.has(url)) {
-    photoDimensions.set(url, new Promise(resolve => {
-      const image = new Image()
-      const finish = (result: { width: number; height: number } | null) => {
-        clearTimeout(timeout)
-        image.onload = image.onerror = null
-        if (!result) photoDimensions.delete(url)
-        resolve(result)
-      }
-      const timeout = setTimeout(() => finish(null), 6000)
-      image.onload = () => finish({ width: image.naturalWidth, height: image.naturalHeight })
-      image.onerror = () => finish(null)
-      image.src = url
-    }))
-  }
-  return photoDimensions.get(url)!
-}
-
-// Keep the reference system's A4 card structure, using only public catalog data.
-export async function buildBillboardCardsHTML(billboards: Billboard[], options: CardPrintOptions): Promise<string> {
-  const { includeLogo, includeImages, pricing, ar } = options
-  const text = (arabic: string, english: string) => ar ? arabic : english
-  const safe = (value: unknown) => escapeHtml(String(value ?? ''))
-  const asset = (path: string) => safe(new URL(`${import.meta.env.BASE_URL}${path}`, document.baseURI).href)
-  const safeUrl = (value: string) => {
-    try {
-      const url = new URL(value, document.baseURI)
-      return ['http:', 'https:'].includes(url.protocol) ? url.href : ''
-    } catch { return '' }
-  }
-  const pages: string[] = []
-  const printImages = await preparePrintImages(includeImages ? billboards.map(board => safeUrl(board.imageUrl || '')) : [], 1600)
-  // Measure in parallel so rounded borders follow the actual photo, without cropping.
-  const dimensions = await Promise.all(billboards.map(board => {
-    const url = includeImages && board.imageUrl ? safeUrl(board.imageUrl) : ''
-    return url ? measurePhoto(url) : Promise.resolve(null)
-  }))
-  for (const [index, board] of billboards.entries()) {
-    const mapUrl = board.coordinates
-      ? `https://www.google.com/maps?q=${encodeURIComponent(board.coordinates)}`
-      : safeUrl(board.gpsLink || '')
-    const qr = mapUrl ? await QRCode.toDataURL(mapUrl, { width: 200, margin: 1 }) : ''
-    const sourceUrl = board.imageUrl ? safeUrl(board.imageUrl) : ''
-    const imageUrl = printImages.get(sourceUrl) || sourceUrl
-    const dimension = dimensions[index]
-    const imageHeight = (pricing.includePricing ? 37 : 44) * 297 / 210 - .6
-    const ratio = dimension && dimension.height > 0 ? dimension.width / dimension.height : 0
-    const fittedWidth = ratio ? Math.min(87.4, imageHeight * ratio) : 0
-    const photoStyle = ratio ? ` style="width:${fittedWidth}cqw;height:${fittedWidth / ratio}cqw"` : ''
-    const level = board.level?.toUpperCase() || 'A'
-    const price = pricing.includePricing ? getPrice(level, board.size, pricing.period, 'company') : 0
-    const discount = pricing.discounts[level] || { type: 'percentage' as const, value: 0 }
-    const discounted = calculateDiscountedPrice(price, discount.type, discount.value)
-    const field = (label: string, value: string, ltr = false) => `<div class="spec"><small>${safe(label)}</small><strong${ltr ? ' dir="ltr"' : ''}>${safe(value || '—')}</strong></div>`
-    pages.push(`<section class="page reference-template">
-      <img class="reference-background" src="${asset(includeLogo ? 'billboard-print-with-logo.svg' : 'billboard-print-without-logo.svg')}" alt="" />
-      <header>${includeLogo ? `<img src="${asset('new-logo-laigt.svg')}" alt="${safe(text('الفارس الذهبي', 'Al Fares Al Dahabi'))}" />` : ''}<div class="report-title"><strong>${text('بطاقة موقع إعلاني', 'BILLBOARD PRESENTATION')}</strong><span>${text('الفارس الذهبي للدعاية والإعلان', 'Al Fares Al Dahabi Advertising')}</span></div></header>
-      <div class="heading"><div><small>${text('اسم اللوحة / الكود', 'Board name / code')}</small><h1 dir="ltr">${safe(board.name || board.id)}</h1></div><span class="status">${safe(board.status || '—')}</span></div>
-      <div class="specs">${field(text('المقاس', 'Size'), board.size, true)}${field(text('نوع اللوحة', 'Type'), board.billboardType)}${field(text('عدد الأوجه', 'Faces'), board.facesCount)}${field(text('الفئة', 'Level'), board.level)}</div>
-      ${includeImages ? `<div class="photo">${imageUrl ? `<img src="${safe(imageUrl)}" alt="${safe(board.name)}"${photoStyle} /><span class="image-error" hidden>${text('تعذر تحميل صورة اللوحة', 'Board photo could not be loaded')}</span>` : `<span>${text('صورة اللوحة غير متوفرة', 'Board photo unavailable')}</span>`}</div>` : ''}
-      <div class="location"><div><small>${text('الموقع', 'Location')}</small><h2>${safe(board.location || board.landmark || '—')}</h2><p>${safe([...new Set([board.city, board.municipality, board.area].filter(Boolean))].join(' · '))}</p>${board.landmark && board.landmark !== board.location ? `<p>${safe(board.landmark)}</p>` : ''}${board.status !== 'متاح' && board.expiryDate ? `<p>${text('تاريخ انتهاء الحجز:', 'Booking ends:')} ${safe(formatExpiryDate(board.expiryDate))}</p>` : ''}</div>
-      ${qr ? `<a class="map" href="${safe(mapUrl)}" target="_blank" rel="noopener noreferrer"><img src="${qr}" alt="QR"/><span>${text('امسح أو اضغط لفتح الموقع', 'Scan or click for location')}</span></a>` : `<span class="no-map">${text('الموقع الجغرافي غير متوفر', 'Map location unavailable')}</span>`}</div>
-      ${pricing.includePricing ? `<div class="pricing"><div class="rental-price"><small>${text('قيمة الإيجار للمدة', 'Price for rental period')}</small><strong>${price > 0 ? safe(formatPrice(discounted)) : text('حسب الاستفسار', 'On request')}</strong>${price > discounted && price > 0 ? `<del>${safe(formatPrice(price))}</del>` : ''}</div><div class="rental-period"><small>${text('مدة الإيجار', 'Rental period')}</small><strong>${safe(RENTAL_PERIODS.find(period => period.value === pricing.period)?.label || pricing.period)}</strong></div></div>` : ''}
-      <footer><span>${text('اللوحات المختارة', 'Selected billboards')} · ${safe(new Date().toLocaleDateString(ar ? 'ar-LY' : 'en-GB'))}</span><span>${index + 1} / ${billboards.length}</span></footer>
-    </section>`)
-  }
-  return `<!doctype html><html lang="${ar ? 'ar' : 'en'}" dir="${ar ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>${text('بطاقات اللوحات المختارة', 'Selected billboard cards')} (${billboards.length})</title><style>
-    @font-face{font-family:Doran;src:url('${asset('fonts/Doran-Regular.otf')}')}@font-face{font-family:Doran;src:url('${asset('fonts/Doran-Bold.otf')}');font-weight:700}
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>بطاقات اللوحات المختارة (1)</title><style>
+    @font-face{font-family:Doran;src:url('http://localhost:8081/fonts/Doran-Regular.otf')}@font-face{font-family:Doran;src:url('http://localhost:8081/fonts/Doran-Bold.otf');font-weight:700}
     *{box-sizing:border-box}body{margin:0;background:#ececec;color:#282a2c;font:14px Doran,Arial,sans-serif}small{display:block;color:#626568;font-size:11px}h1,h2,p{margin:0}h1{font-size:26px;overflow-wrap:anywhere}h2{font-size:20px;line-height:1.5;overflow-wrap:anywhere}p{margin-top:5px;color:#535658}.page{width:190mm;min-height:277mm;margin:18mm auto;padding:0;background:white;display:flex;flex-direction:column;gap:5mm;box-shadow:0 4px 28px #0002}header img{display:block;width:100%;height:27mm;object-fit:contain}.heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.status{background:#faf2cf;border:1px solid #ddba4a;border-radius:30px;padding:6px 16px;flex-shrink:0}.specs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid #dedede;border-radius:8px}.spec{padding:10px;text-align:center;overflow-wrap:anywhere}.spec strong{display:block;font-size:18px}.photo{height:123mm;flex-shrink:0;background:#f4f4f2;border:1px solid #e2e2df;display:flex;align-items:center;justify-content:center;color:#777}.photo img{width:100%;height:100%;object-fit:contain}.location{display:flex;gap:6mm;align-items:center}.location>div{flex:1;min-width:0}.map{width:30mm;flex-shrink:0;text-align:center;color:#282a2c;text-decoration:none;font-size:10px}.map img{width:26mm;height:26mm;display:block;margin:auto}.no-map{font-size:11px;color:#777}.pricing{padding:10px 16px;background:#faf2cf;border-inline-start:4px solid #d7af37;display:flex;align-items:center;justify-content:space-between;gap:10px}.pricing strong{font-size:20px}.pricing del{margin-inline-start:12px;color:#686868}footer{margin-top:auto;border-top:1px solid #ddd;padding:10px 0;display:flex;justify-content:space-between;font-size:11px;color:#666}.toolbar{position:sticky;top:0;background:#282a2c;color:white;padding:12px;display:flex;justify-content:center;gap:14px;align-items:center;z-index:1}.toolbar button{font:inherit;border:0;border-radius:6px;background:#e8cc64;padding:10px 22px;cursor:pointer}.toolbar button:disabled{opacity:.6;cursor:wait}
     @media screen and (max-width:760px){.page{width:calc(100% - 24px);min-height:0;padding:12px;margin:14px auto;gap:16px}.photo{height:auto;aspect-ratio:4/3}.spec{padding:8px 3px}.spec strong{font-size:15px}h1{font-size:21px}h2{font-size:17px}.toolbar{flex-wrap:wrap;font-size:12px}}
     @page{size:A4 portrait;margin:10mm}@media print{body{background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact}.toolbar{display:none!important}.page{margin:0;width:190mm;min-height:276mm;box-shadow:none;break-after:page}.page:last-child{break-after:auto}.photo,.specs,.location,.pricing{break-inside:avoid}}
@@ -104,7 +19,7 @@ export async function buildBillboardCardsHTML(billboards: Billboard[], options: 
     .reference-template .spec:nth-child(3){left:56.3%;top:20.6%;width:14.8%}
     .reference-template .spec:nth-child(3) strong{font-size:1.7cqw;font-weight:400}
     .reference-template .spec:nth-child(2){display:none}
-    .reference-template .photo{position:absolute;left:6%;top:31.3%;width:88%;height:${pricing.includePricing ? '37%' : '44%'};min-height:0;aspect-ratio:auto;background:transparent;border:0;padding:.3cqw;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .reference-template .photo{position:absolute;left:6%;top:31.3%;width:88%;height:44%;min-height:0;aspect-ratio:auto;background:transparent;border:0;padding:.3cqw;display:flex;align-items:center;justify-content:center;overflow:hidden}
     /* Outline follows the visible photo rather than the empty contain-fit margins. */
     .reference-template .photo img{display:block;width:100%;height:100%;min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:0;filter:drop-shadow(.1cqw 0 0 #343434) drop-shadow(-.1cqw 0 0 #343434) drop-shadow(0 .1cqw 0 #343434) drop-shadow(0 -.1cqw 0 #343434)}
     .reference-template .location{position:static;padding:0;background:none;border:0;display:block}
@@ -127,9 +42,19 @@ export async function buildBillboardCardsHTML(billboards: Billboard[], options: 
     @media screen and (max-width:800px){.reference-template{width:100%;height:auto;aspect-ratio:210/297;margin:10px auto}}
     @page{size:A4 portrait;margin:0}
     .toolbar{flex-wrap:wrap;padding-top:max(12px,env(safe-area-inset-top))}.toolbar button,.toolbar .close-preview{min-height:44px}.toolbar .close-preview{display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border:1px solid #ffffff60;border-radius:6px;color:white;text-decoration:none;font:inherit}.toolbar .close-preview:hover{background:#ffffff15}.toolbar .close-preview:focus-visible{outline:2px solid #e8cc64;outline-offset:3px}
-    ${options.thumbnail ? 'body{background:white;overflow:hidden}.toolbar{display:none}.reference-template{width:100%;height:auto;aspect-ratio:210/297;margin:0;box-shadow:none}' : ''}
+    body{background:white;overflow:hidden}.toolbar{display:none}.reference-template{width:100%;height:auto;aspect-ratio:210/297;margin:0;box-shadow:none}
     @media print{.reference-template{width:210mm;height:297mm;min-height:0;margin:0;break-after:page;break-inside:avoid}.reference-template:last-child{break-after:auto}}
-    </style></head><body><div class="toolbar"><a id="close-preview" class="close-preview" href="${safe(window.location.href)}">${text('إغلاق والعودة للموقع', 'Close and return to site')}</a><span id="ready">${text('جارٍ تحميل الصور والخطوط…', 'Loading photos and fonts…')}</span><button id="print" disabled>${text('طباعة / حفظ PDF', 'Print / Save PDF')}</button></div>${pages.join('')}
+    </style></head><body><div class="toolbar"><a id="close-preview" class="close-preview" href="http://localhost:8081/">إغلاق والعودة للموقع</a><span id="ready">جارٍ تحميل الصور والخطوط…</span><button id="print" disabled>طباعة / حفظ PDF</button></div><section class="page reference-template">
+      <img class="reference-background" src="http://localhost:8081/billboard-print-with-logo.svg" alt="" />
+      <header><img src="http://localhost:8081/new-logo-laigt.svg" alt="الفارس الذهبي" /><div class="report-title"><strong>بطاقة موقع إعلاني</strong><span>الفارس الذهبي للدعاية والإعلان</span></div></header>
+      <div class="heading"><div><small>اسم اللوحة / الكود</small><h1 dir="ltr">TR-BS0030</h1></div><span class="status">متاح</span></div>
+      <div class="specs"><div class="spec"><small>المقاس</small><strong dir="ltr">13x5</strong></div><div class="spec"><small>نوع اللوحة</small><strong>تيبول</strong></div><div class="spec"><small>عدد الأوجه</small><strong>وجهين</strong></div><div class="spec"><small>الفئة</small><strong>A</strong></div></div>
+      <div class="photo"><img src="https://lh3.googleusercontent.com/d/1rYdQ_POKIve2I6LLkxCX7kTV4XXovLVP" alt="TR-BS0030" /><span class="image-error" hidden>تعذر تحميل صورة اللوحة</span></div>
+      <div class="location"><div><small>الموقع</small><h2>جزيرة باب العزيزية امام مسجد الإمام الشافعي</h2><p>طرابلس · بوسليم</p></div>
+      <a class="map" href="https://www.google.com/maps?q=32.867010%2C13.177549" target="_blank" rel="noopener noreferrer"><img src="data:image/png;base64,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" alt="QR"/><span>امسح أو اضغط لفتح الموقع</span></a></div>
+      
+      <footer><span>اللوحات المختارة · 1‏/10‏/2026</span><span>1 / 1</span></footer>
+    </section>
     <script>
     const closePreview=document.getElementById('close-preview');
     const returnToSite=()=>{window.close();setTimeout(()=>{window.location.replace(closePreview.href);},150);};
@@ -143,12 +68,6 @@ export async function buildBillboardCardsHTML(billboards: Billboard[], options: 
     }));
     Promise.race([Promise.all([...images,document.fonts.ready]),new Promise(resolve=>setTimeout(resolve,20000))]).then(()=>{
       const missing=Array.from(document.querySelectorAll('.photo img')).some(img=>!img.complete||!img.naturalWidth);
-      if(button){document.getElementById('ready').textContent=missing?'${text('بعض الصور لم تُحمّل. يمكنك الانتظار أو الطباعة.', 'Some photos are unavailable. You can wait or print.')}':'${text('المعاينة جاهزة — اختر حفظ PDF من نافذة الطباعة', 'Preview ready — choose Save as PDF in the print dialog')}';button.disabled=false;}
+      if(button){document.getElementById('ready').textContent=missing?'بعض الصور لم تُحمّل. يمكنك الانتظار أو الطباعة.':'المعاينة جاهزة — اختر حفظ PDF من نافذة الطباعة';button.disabled=false;}
     });
-    </script></body></html>`
-}
-
-export async function printBillboardCards(billboards: Billboard[], options: CardPrintOptions): Promise<void> {
-  if (!billboards.length) throw new Error(options.ar ? 'اختر لوحة واحدة على الأقل.' : 'Select at least one board.')
-  await openPrintPreview(() => buildBillboardCardsHTML(billboards, options), options.ar ? 'صفحات اللوحات' : 'Billboard pages', billboards.length, options.ar)
-}
+    </script></body></html>

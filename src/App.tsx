@@ -1,3 +1,4 @@
+import { preparePrintImages } from '@/services/printImages'
 import { matchesAvailability } from '@/utils/availability'
 import { useState, useMemo, useEffect, lazy, Suspense } from "react"
 
@@ -229,6 +230,7 @@ export default function App() {
     const billboardsToPrint = customBillboards || filteredBillboards
     return openPrintPreview(async () => {
 
+    const printImages = await preparePrintImages(includeImages ? billboardsToPrint.map(board => board.imageUrl || '') : [], 480)
     const qrCodes: { [key: string]: string } = {}
     for (const billboard of billboardsToPrint) {
       if (billboard.coordinates) {
@@ -282,8 +284,8 @@ export default function App() {
           th { background: #000000; color: #E8CC64; font-weight: 700; font-size: 8px; height: 30px; border: 1px solid #000000; padding: 4px 2px; }
           td { border: 1px solid #000000; padding: 2px; text-align: center; vertical-align: middle; background: #ffffff; color: #000; }
           td.number-cell { background: #E8CC64; padding: 2px; font-weight: 700; font-size: 9px; color: #000; width: 60px; }
-          td.image-cell { background: #ffffff; padding: 0; width: 70px; }
-          .billboard-image { width: 100%; height: auto; max-height: 55px; object-fit: contain; display: block; margin: 0 auto; }
+          td.image-cell { background: #ffffff; padding: 0; width: 90px; height: 64px; }
+          .billboard-image { width: auto; height: 64px; max-width: 100%; object-fit: contain; display: block; margin: 0 auto; border-radius: 0; }
           .billboard-number { color: #000; font-weight: 700; font-size: 9px; }
           .status-available { color: #16a34a; font-weight: 700; font-size: 8px; }
           td.qr-cell { width: 60px; padding: 2px; vertical-align: middle; }
@@ -339,7 +341,7 @@ export default function App() {
               <tr style="height: 60px;">
                 <td class="number-cell"><div class="billboard-number">${index + 1}</div></td>
                 <td style="font-size: 8px; font-weight: 800; color: #1a1a2e; background: #f5f5f5; padding: 4px; white-space: nowrap;"><span dir="ltr" style="direction:ltr; unicode-bidi:bidi-override; display:inline-block;">${exportCode}</span></td>
-                ${includeImages ? `<td class="image-cell">${billboard.imageUrl ? `<img src="${escapeHtml(billboard.imageUrl)}" alt="صورة" class="billboard-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><div class="image-placeholder" style="display:none;"><span>صورة</span></div>` : `<div class="image-placeholder"><span>صورة</span></div>`}</td>` : ''}
+                ${includeImages ? `<td class="image-cell">${billboard.imageUrl ? `<img src="${escapeHtml(printImages.get(billboard.imageUrl) || billboard.imageUrl)}" alt="صورة" class="billboard-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><div class="image-placeholder" style="display:none;"><span>صورة</span></div>` : `<div class="image-placeholder"><span>صورة</span></div>`}</td>` : ''}
                 <td style="font-weight: 500; text-align: right; padding: 4px; font-size: 8px;">${escapeHtml(billboard.location)}</td>
                 <td style="font-size: 8px; padding: 2px;">${escapeHtml(billboard.area)}</td>
                 <td style="font-size: 8px; padding: 2px;">${escapeHtml(billboard.municipality)}</td>
